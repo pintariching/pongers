@@ -12,6 +12,7 @@ mod camera;
 mod game_state;
 mod paddle;
 mod state;
+mod mesh;
 
 pub async fn run() {
     let event_loop = EventLoop::new();

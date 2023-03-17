@@ -1,6 +1,6 @@
 use wgpu::{
     include_wgsl, Backends, Color, CommandEncoderDescriptor, Device, DeviceDescriptor, Features,
-    InstanceDescriptor, Limits, LoadOp, Operations, PowerPreference, Queue,
+    IndexFormat, InstanceDescriptor, Limits, LoadOp, Operations, PowerPreference, Queue,
     RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RequestAdapterOptions,
     Surface, SurfaceConfiguration, SurfaceError, TextureUsages, TextureViewDescriptor,
 };
@@ -9,6 +9,7 @@ use winit::event::{ElementState, KeyboardInput, WindowEvent};
 use winit::window::Window;
 
 use crate::game_state::GameState;
+use crate::mesh::Vertex;
 
 pub struct State {
     pub surface: Surface,
@@ -106,7 +107,7 @@ impl State {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
-                buffers: &[],
+                buffers: &[Vertex::desc()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
@@ -237,12 +238,14 @@ impl State {
                 depth_stencil_attachment: None,
             });
 
-            // render_pass.set_vertex_buffer(1, self.game_state.instance_buffers[0].slice(..));
             render_pass.set_pipeline(&self.render_pipeline);
-            // render_pass.draw_model(
-            //     &self.game_state.models[0],
-            //     &self.game_state.camera_bind_group,
-            // );
+            render_pass
+                .set_vertex_buffer(0, self.game_state.left_paddle.mesh.vertex_buffer.slice(..));
+            render_pass.set_index_buffer(
+                self.game_state.left_paddle.mesh.index_buffer.slice(..),
+                IndexFormat::Uint32,
+            );
+            render_pass.draw_indexed(0..self.game_state.left_paddle.mesh.num_indices, 0, 0..1);
         }
 
         // submit will accept anything that implements IntoIter
