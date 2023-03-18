@@ -79,6 +79,7 @@ impl GameState {
                 Vec2::X,
                 VirtualKeyCode::W,
                 VirtualKeyCode::S,
+                window_size,
             ),
             right_paddle: Paddle::new(
                 device,
@@ -86,8 +87,9 @@ impl GameState {
                 Vec2::NEG_X,
                 VirtualKeyCode::Up,
                 VirtualKeyCode::Down,
+                window_size,
             ),
-            ball: Ball {},
+            ball: Ball::new(device),
             camera,
             camera_uniform,
             camera_buffer,

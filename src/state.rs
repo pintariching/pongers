@@ -1,14 +1,19 @@
+use std::time::Instant;
+
 use wgpu::{
     include_wgsl, Backends, Color, CommandEncoderDescriptor, Device, DeviceDescriptor, Features,
-    IndexFormat, InstanceDescriptor, Limits, LoadOp, Operations, PowerPreference, Queue,
-    RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RequestAdapterOptions,
-    Surface, SurfaceConfiguration, SurfaceError, TextureUsages, TextureViewDescriptor,
+    IndexFormat, InstanceDescriptor, Limits, LoadOp, MultisampleState, Operations, PowerPreference,
+    PrimitiveState, Queue, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
+    RequestAdapterOptions, Surface, SurfaceConfiguration, SurfaceError, TextureUsages,
+    TextureViewDescriptor,
 };
 use winit::dpi::PhysicalSize;
 use winit::event::{ElementState, KeyboardInput, WindowEvent};
 use winit::window::Window;
 
+use crate::camera::CameraUniform;
 use crate::game_state::GameState;
+use crate::instance::InstanceRaw;
 use crate::mesh::Vertex;
 
 pub struct State {
@@ -18,7 +23,8 @@ pub struct State {
     pub config: SurfaceConfiguration,
     pub size: PhysicalSize<u32>,
     pub window: Window,
-    pub render_pipeline: RenderPipeline,
+    pub paddle_render_pipeline: RenderPipeline,
+    pub ball_render_pipeline: RenderPipeline,
     pub game_state: GameState,
 }
 
@@ -90,27 +96,76 @@ impl State {
             view_formats: vec![],
         };
 
+        let game_state = GameState::new(&device, &size);
+
         surface.configure(&device, &config);
 
-        let shader = device.create_shader_module(include_wgsl!("shader.wgsl"));
+        let paddle_shader = device.create_shader_module(include_wgsl!("paddle_shader.wgsl"));
+        let ball_shader = device.create_shader_module(include_wgsl!("ball_shader.wgsl"));
 
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
+                bind_group_layouts: &[&game_state.camera_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        let paddle_render_pipeline =
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("Paddle Render Pipeline"),
+                layout: Some(&render_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &paddle_shader,
+                    entry_point: "vs_main",
+                    buffers: &[Vertex::desc(), InstanceRaw::desc()],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &paddle_shader,
+                    entry_point: "fs_main",
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: config.format,
+                        blend: Some(wgpu::BlendState::REPLACE),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: Some(wgpu::Face::Back),
+                    // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    // Requires Features::DEPTH_CLIP_CONTROL
+                    unclipped_depth: false,
+                    // Requires Features::CONSERVATIVE_RASTERIZATION
+                    conservative: false,
+                },
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState {
+                    count: 1,
+                    mask: !0,
+                    alpha_to_coverage_enabled: false,
+                },
+                multiview: None,
+            });
+
+        let ball_render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Ball Render Pipeline Layout"),
                 bind_group_layouts: &[],
                 push_constant_ranges: &[],
             });
 
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Render Pipeline"),
-            layout: Some(&render_pipeline_layout),
+        let ball_render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Ball Render Pipeline"),
+            layout: Some(&ball_render_pipeline_layout),
             vertex: wgpu::VertexState {
-                module: &shader,
+                module: &ball_shader,
                 entry_point: "vs_main",
-                buffers: &[Vertex::desc()],
+                buffers: &[],
             },
             fragment: Some(wgpu::FragmentState {
-                module: &shader,
+                module: &ball_shader,
                 entry_point: "fs_main",
                 targets: &[Some(wgpu::ColorTargetState {
                     format: config.format,
@@ -139,8 +194,6 @@ impl State {
             multiview: None,
         });
 
-        let game_state = GameState::new(&device, &size);
-
         Self {
             surface,
             device,
@@ -148,7 +201,8 @@ impl State {
             config,
             size,
             window,
-            render_pipeline,
+            paddle_render_pipeline,
+            ball_render_pipeline,
             game_state,
         }
     }
@@ -163,6 +217,7 @@ impl State {
             self.config.width = new_size.width;
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
+            self.game_state.camera.window_size = new_size;
         }
     }
 
@@ -189,21 +244,27 @@ impl State {
     }
 
     pub fn update(&mut self) {
-        // let camera_uniform =
-        //     CameraUniform::new(&self.game_state.camera, &self.window().inner_size());
-        // self.queue.write_buffer(
-        //     &self.game_state.camera_buffer,
-        //     0,
-        //     bytemuck::cast_slice(&[camera_uniform]),
-        // );
+        let camera_uniform = CameraUniform::new(&self.game_state.camera);
+        self.queue.write_buffer(
+            &self.game_state.camera_buffer,
+            0,
+            bytemuck::cast_slice(&[camera_uniform]),
+        );
 
-        // self.queue.write_buffer(
-        //     &self.game_state.instance_buffers[0],
-        //     0,
-        //     bytemuck::cast_slice(&[self.game_state.instances[0].to_raw()]),
-        // );
+        self.game_state.left_paddle.instance.position.x = self.size.width as f32 * -0.48;
+        self.queue.write_buffer(
+            &self.game_state.left_paddle.instance_buffer,
+            0,
+            bytemuck::cast_slice(&[self.game_state.left_paddle.instance.to_raw()]),
+        );
 
-        // self.game_state.last_update = Instant::now();
+        self.queue.write_buffer(
+            &self.game_state.ball.instance_buffer,
+            0,
+            bytemuck::cast_slice(&[self.game_state.ball.instance.to_raw()]),
+        );
+
+        self.game_state.last_update = Instant::now();
     }
 
     pub fn render(&mut self) -> Result<(), SurfaceError> {
@@ -238,14 +299,20 @@ impl State {
                 depth_stencil_attachment: None,
             });
 
-            render_pass.set_pipeline(&self.render_pipeline);
-            render_pass
-                .set_vertex_buffer(0, self.game_state.left_paddle.mesh.vertex_buffer.slice(..));
-            render_pass.set_index_buffer(
-                self.game_state.left_paddle.mesh.index_buffer.slice(..),
-                IndexFormat::Uint32,
-            );
-            render_pass.draw_indexed(0..self.game_state.left_paddle.mesh.num_indices, 0, 0..1);
+            render_pass.set_pipeline(&self.ball_render_pipeline);
+            // render_pass.set_vertex_buffer(0, self.game_state.ball.instance_buffer.slice(..));
+            render_pass.draw(0..3, 0..1);
+
+            // render_pass.set_pipeline(&self.paddle_render_pipeline);
+            // render_pass.set_vertex_buffer(1, self.game_state.left_paddle.instance_buffer.slice(..));
+            // render_pass
+            //     .set_vertex_buffer(0, self.game_state.left_paddle.mesh.vertex_buffer.slice(..));
+            // render_pass.set_index_buffer(
+            //     self.game_state.left_paddle.mesh.index_buffer.slice(..),
+            //     IndexFormat::Uint32,
+            // );
+            // render_pass.set_bind_group(0, &self.game_state.camera_bind_group, &[]);
+            // render_pass.draw_indexed(0..self.game_state.left_paddle.mesh.num_indices, 0, 0..1);
         }
 
         // submit will accept anything that implements IntoIter

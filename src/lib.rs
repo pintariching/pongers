@@ -10,9 +10,10 @@ use winit::{
 mod ball;
 mod camera;
 mod game_state;
+mod instance;
+mod mesh;
 mod paddle;
 mod state;
-mod mesh;
 
 pub async fn run() {
     let event_loop = EventLoop::new();

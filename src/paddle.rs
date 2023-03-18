@@ -1,14 +1,18 @@
 use glam::Vec2;
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    BufferUsages, Device,
+    Buffer, BufferUsages, Device,
 };
-use winit::event::VirtualKeyCode;
+use winit::{dpi::PhysicalSize, event::VirtualKeyCode};
 
-use crate::mesh::{Mesh, Vertex};
+use crate::{
+    instance::Instance,
+    mesh::{Mesh, Vertex},
+};
 
 pub struct Paddle {
-    pub position: Vec2,
+    pub instance: Instance,
+    pub instance_buffer: Buffer,
     pub direction: Vec2,
     pub up: VirtualKeyCode,
     pub down: VirtualKeyCode,
@@ -22,6 +26,7 @@ impl Paddle {
         direction: Vec2,
         up: VirtualKeyCode,
         down: VirtualKeyCode,
+        window_size: &PhysicalSize<u32>,
     ) -> Self {
         let vertices = &[
             Vertex {
@@ -29,11 +34,11 @@ impl Paddle {
                 color: [1., 1., 1.],
             },
             Vertex {
-                position: [1., 0., 0.],
+                position: [0.2, 0., 0.],
                 color: [1., 1., 1.],
             },
             Vertex {
-                position: [1., -1., 0.],
+                position: [0.2, -1., 0.],
                 color: [1., 1., 1.],
             },
             Vertex {
@@ -63,12 +68,25 @@ impl Paddle {
             num_indices: 6,
         };
 
+        let instance = Instance {
+            position: Vec2::new(window_size.width as f32 * -0.48, 0.),
+            rotation: 0.,
+            scale: 100.,
+        };
+
+        let instance_buffer = device.create_buffer_init(&BufferInitDescriptor {
+            label: Some("Instance Buffer"),
+            contents: bytemuck::cast_slice(&[instance.to_raw()]),
+            usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
+        });
+
         Self {
-            position,
             direction,
             up,
             down,
             mesh,
+            instance,
+            instance_buffer,
         }
     }
 }
