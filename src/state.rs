@@ -303,16 +303,16 @@ impl State {
             // render_pass.set_vertex_buffer(0, self.game_state.ball.instance_buffer.slice(..));
             render_pass.draw(0..3, 0..1);
 
-            // render_pass.set_pipeline(&self.paddle_render_pipeline);
-            // render_pass.set_vertex_buffer(1, self.game_state.left_paddle.instance_buffer.slice(..));
-            // render_pass
-            //     .set_vertex_buffer(0, self.game_state.left_paddle.mesh.vertex_buffer.slice(..));
-            // render_pass.set_index_buffer(
-            //     self.game_state.left_paddle.mesh.index_buffer.slice(..),
-            //     IndexFormat::Uint32,
-            // );
-            // render_pass.set_bind_group(0, &self.game_state.camera_bind_group, &[]);
-            // render_pass.draw_indexed(0..self.game_state.left_paddle.mesh.num_indices, 0, 0..1);
+            render_pass.set_pipeline(&self.paddle_render_pipeline);
+            render_pass.set_vertex_buffer(1, self.game_state.left_paddle.instance_buffer.slice(..));
+            render_pass
+                .set_vertex_buffer(0, self.game_state.left_paddle.mesh.vertex_buffer.slice(..));
+            render_pass.set_index_buffer(
+                self.game_state.left_paddle.mesh.index_buffer.slice(..),
+                IndexFormat::Uint32,
+            );
+            render_pass.set_bind_group(0, &self.game_state.camera_bind_group, &[]);
+            render_pass.draw_indexed(0..self.game_state.left_paddle.mesh.num_indices, 0, 0..1);
         }
 
         // submit will accept anything that implements IntoIter
