@@ -4,30 +4,63 @@ use wgpu::{
     Buffer, BufferUsages, Device,
 };
 
-use crate::instance::Instance;
+use crate::{
+    instance::Instance,
+    mesh::{Mesh, Vertex},
+};
 
 pub struct Ball {
-    pub instance: Instance,
-    pub instance_buffer: Buffer,
+    pub center: Vec2,
+    pub radius: f32,
+    pub mesh: Mesh,
 }
 
 impl Ball {
-    pub fn new(device: &Device) -> Self {
-        let instance = Instance {
-            position: Vec2::new(0., 0.),
-            rotation: 0.,
-            scale: 100.,
-        };
+    pub fn new(device: &Device, center: Vec2, radius: f32) -> Self {
+        let vertices = &[
+            Vertex {
+                position: [radius, radius, 0.],
+                color: [0., 0., 0.],
+            },
+            Vertex {
+                position: [radius, -radius, 0.],
+                color: [0., 0., 0.],
+            },
+            Vertex {
+                position: [-radius, -radius, 0.],
+                color: [0., 0., 0.],
+            },
+            Vertex {
+                position: [-radius, radius, 0.],
+                color: [0., 0., 0.],
+            },
+        ];
 
-        let instance_buffer = device.create_buffer_init(&BufferInitDescriptor {
-            label: Some("Instance Buffer"),
-            contents: bytemuck::cast_slice(&[instance.to_raw()]),
-            usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
+        let indices = &[0, 1, 2, 2, 3, 0];
+
+        let vertex_buffer = device.create_buffer_init(&BufferInitDescriptor {
+            label: Some("Vertex Buffer"),
+            contents: bytemuck::cast_slice(vertices),
+            usage: BufferUsages::VERTEX,
         });
 
+        let index_buffer = device.create_buffer_init(&BufferInitDescriptor {
+            label: Some("Index Buffer"),
+            contents: bytemuck::cast_slice(indices),
+            usage: BufferUsages::INDEX,
+        });
+
+        let mesh = Mesh {
+            name: "Mesh".into(),
+            vertex_buffer,
+            index_buffer,
+            num_indices: 6,
+        };
+
         Self {
-            instance,
-            instance_buffer,
+            center,
+            radius,
+            mesh,
         }
     }
 }

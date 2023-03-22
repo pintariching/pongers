@@ -1,5 +1,3 @@
-// Vertex shader
-
 struct Camera {
     view_proj: mat4x4<f32>,
 }
@@ -20,7 +18,7 @@ struct InstanceInput {
 }
 
 struct VertexOutput {
-    @builtin(position) clip_position: vec4<f32>,
+    @builtin(position) position: vec4<f32>,
     @location(0) color: vec3<f32>,
 }
 
@@ -36,12 +34,10 @@ fn vs_main(vert: VertexInput, instance: InstanceInput) -> VertexOutput {
     var out: VertexOutput;
 
     out.color = vert.color;
-    out.clip_position = camera.view_proj * model_matrix * vec4<f32>(vert.position, 1.);
+    out.position = camera.view_proj * model_matrix * vec4<f32>(vert.position, 1.);
 
     return out;
 }
-
-// Fragment shader
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {

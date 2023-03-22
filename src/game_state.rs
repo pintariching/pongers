@@ -89,7 +89,7 @@ impl GameState {
                 VirtualKeyCode::Down,
                 window_size,
             ),
-            ball: Ball::new(device),
+            ball: Ball::new(device, Vec2::new(0., 0.), 100.),
             camera,
             camera_uniform,
             camera_buffer,

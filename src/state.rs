@@ -152,7 +152,7 @@ impl State {
         let ball_render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Ball Render Pipeline Layout"),
-                bind_group_layouts: &[],
+                bind_group_layouts: &[&game_state.camera_bind_group_layout],
                 push_constant_ranges: &[],
             });
 
@@ -162,7 +162,7 @@ impl State {
             vertex: wgpu::VertexState {
                 module: &ball_shader,
                 entry_point: "vs_main",
-                buffers: &[],
+                buffers: &[Vertex::desc(), InstanceRaw::desc()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &ball_shader,
@@ -300,13 +300,19 @@ impl State {
             });
 
             render_pass.set_pipeline(&self.ball_render_pipeline);
-            // render_pass.set_vertex_buffer(0, self.game_state.ball.instance_buffer.slice(..));
-            render_pass.draw(0..3, 0..1);
+            render_pass.set_vertex_buffer(0, self.game_state.ball.mesh.vertex_buffer.slice(..));
+            render_pass.set_vertex_buffer(1, self.game_state.ball.instance_buffer.slice(..));
+            render_pass.set_index_buffer(
+                self.game_state.ball.mesh.index_buffer.slice(..),
+                IndexFormat::Uint32,
+            );
+            render_pass.set_bind_group(0, &self.game_state.camera_bind_group, &[]);
+            render_pass.draw_indexed(0..self.game_state.ball.mesh.num_indices, 0, 0..1);
 
             render_pass.set_pipeline(&self.paddle_render_pipeline);
-            render_pass.set_vertex_buffer(1, self.game_state.left_paddle.instance_buffer.slice(..));
             render_pass
                 .set_vertex_buffer(0, self.game_state.left_paddle.mesh.vertex_buffer.slice(..));
+            render_pass.set_vertex_buffer(1, self.game_state.left_paddle.instance_buffer.slice(..));
             render_pass.set_index_buffer(
                 self.game_state.left_paddle.mesh.index_buffer.slice(..),
                 IndexFormat::Uint32,
