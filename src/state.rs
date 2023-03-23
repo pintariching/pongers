@@ -2,19 +2,19 @@ use std::time::Instant;
 
 use wgpu::{
     include_wgsl, Backends, Color, CommandEncoderDescriptor, Device, DeviceDescriptor, Features,
-    IndexFormat, InstanceDescriptor, Limits, LoadOp, MultisampleState, Operations, PowerPreference,
-    PrimitiveState, Queue, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
-    RequestAdapterOptions, Surface, SurfaceConfiguration, SurfaceError, TextureUsages,
-    TextureViewDescriptor,
+    IndexFormat, InstanceDescriptor, Limits, LoadOp, Operations, PowerPreference, Queue,
+    RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RequestAdapterOptions,
+    Surface, SurfaceConfiguration, SurfaceError, TextureUsages, TextureViewDescriptor,
 };
 use winit::dpi::PhysicalSize;
 use winit::event::{ElementState, KeyboardInput, WindowEvent};
 use winit::window::Window;
 
+use crate::ball::BallRaw;
 use crate::camera::CameraUniform;
 use crate::game_state::GameState;
-use crate::instance::InstanceRaw;
 use crate::mesh::Vertex;
+use crate::paddle::PaddleRaw;
 
 pub struct State {
     pub surface: Surface,
@@ -117,7 +117,7 @@ impl State {
                 vertex: wgpu::VertexState {
                     module: &paddle_shader,
                     entry_point: "vs_main",
-                    buffers: &[Vertex::desc(), InstanceRaw::desc()],
+                    buffers: &[Vertex::desc(), PaddleRaw::desc()],
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: &paddle_shader,
@@ -162,7 +162,7 @@ impl State {
             vertex: wgpu::VertexState {
                 module: &ball_shader,
                 entry_point: "vs_main",
-                buffers: &[Vertex::desc(), InstanceRaw::desc()],
+                buffers: &[Vertex::desc(), BallRaw::desc()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &ball_shader,
@@ -251,17 +251,22 @@ impl State {
             bytemuck::cast_slice(&[camera_uniform]),
         );
 
-        self.game_state.left_paddle.instance.position.x = self.size.width as f32 * -0.48;
         self.queue.write_buffer(
-            &self.game_state.left_paddle.instance_buffer,
+            &self.game_state.left_paddle_buffer,
             0,
-            bytemuck::cast_slice(&[self.game_state.left_paddle.instance.to_raw()]),
+            bytemuck::cast_slice(&[self.game_state.left_paddle.to_raw()]),
         );
 
         self.queue.write_buffer(
-            &self.game_state.ball.instance_buffer,
+            &self.game_state.right_paddle_buffer,
             0,
-            bytemuck::cast_slice(&[self.game_state.ball.instance.to_raw()]),
+            bytemuck::cast_slice(&[self.game_state.right_paddle.to_raw()]),
+        );
+
+        self.queue.write_buffer(
+            &self.game_state.ball_buffer,
+            0,
+            bytemuck::cast_slice(&[self.game_state.ball.to_raw()]),
         );
 
         self.game_state.last_update = Instant::now();
@@ -301,7 +306,7 @@ impl State {
 
             render_pass.set_pipeline(&self.ball_render_pipeline);
             render_pass.set_vertex_buffer(0, self.game_state.ball.mesh.vertex_buffer.slice(..));
-            render_pass.set_vertex_buffer(1, self.game_state.ball.instance_buffer.slice(..));
+            render_pass.set_vertex_buffer(1, self.game_state.ball_buffer.slice(..));
             render_pass.set_index_buffer(
                 self.game_state.ball.mesh.index_buffer.slice(..),
                 IndexFormat::Uint32,
@@ -310,15 +315,28 @@ impl State {
             render_pass.draw_indexed(0..self.game_state.ball.mesh.num_indices, 0, 0..1);
 
             render_pass.set_pipeline(&self.paddle_render_pipeline);
+
+            // Left paddle
             render_pass
                 .set_vertex_buffer(0, self.game_state.left_paddle.mesh.vertex_buffer.slice(..));
-            render_pass.set_vertex_buffer(1, self.game_state.left_paddle.instance_buffer.slice(..));
+            render_pass.set_vertex_buffer(1, self.game_state.left_paddle_buffer.slice(..));
             render_pass.set_index_buffer(
                 self.game_state.left_paddle.mesh.index_buffer.slice(..),
                 IndexFormat::Uint32,
             );
             render_pass.set_bind_group(0, &self.game_state.camera_bind_group, &[]);
             render_pass.draw_indexed(0..self.game_state.left_paddle.mesh.num_indices, 0, 0..1);
+
+            // Right paddle
+            render_pass
+                .set_vertex_buffer(0, self.game_state.right_paddle.mesh.vertex_buffer.slice(..));
+            render_pass.set_vertex_buffer(1, self.game_state.right_paddle_buffer.slice(..));
+            render_pass.set_index_buffer(
+                self.game_state.right_paddle.mesh.index_buffer.slice(..),
+                IndexFormat::Uint32,
+            );
+            render_pass.set_bind_group(0, &self.game_state.camera_bind_group, &[]);
+            render_pass.draw_indexed(0..self.game_state.right_paddle.mesh.num_indices, 0, 0..1);
         }
 
         // submit will accept anything that implements IntoIter

@@ -1,21 +1,23 @@
+use std::{collections::HashSet, time::Instant};
+
+use bytemuck::{Pod, Zeroable};
 use glam::Vec2;
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    Buffer, BufferUsages, Device,
+    BufferAddress, BufferUsages, Device, VertexAttribute, VertexBufferLayout, VertexFormat,
+    VertexStepMode,
 };
 use winit::{dpi::PhysicalSize, event::VirtualKeyCode};
 
-use crate::{
-    instance::Instance,
-    mesh::{Mesh, Vertex},
-};
+use crate::mesh::{Mesh, Vertex};
 
 pub struct Paddle {
-    pub instance: Instance,
-    pub instance_buffer: Buffer,
+    pub position: Vec2,
     pub direction: Vec2,
     pub up: VirtualKeyCode,
     pub down: VirtualKeyCode,
+    pub width: f32,
+    pub height: f32,
     pub mesh: Mesh,
 }
 
@@ -26,24 +28,24 @@ impl Paddle {
         direction: Vec2,
         up: VirtualKeyCode,
         down: VirtualKeyCode,
-        window_size: &PhysicalSize<u32>,
+        width: f32,
+        height: f32,
     ) -> Self {
+        let w = width / 2.;
+        let h = height / 2.;
+
         let vertices = &[
             Vertex {
-                position: [0., 0., 0.],
-                color: [1., 1., 1.],
+                position: [w, h, 0.],
             },
             Vertex {
-                position: [0.2, 0., 0.],
-                color: [1., 1., 1.],
+                position: [w, -h, 0.],
             },
             Vertex {
-                position: [0.2, -1., 0.],
-                color: [1., 1., 1.],
+                position: [-w, -h, 0.],
             },
             Vertex {
-                position: [0., -1., 0.],
-                color: [1., 1., 1.],
+                position: [-w, h, 0.],
             },
         ];
 
@@ -68,25 +70,64 @@ impl Paddle {
             num_indices: 6,
         };
 
-        let instance = Instance {
-            position: Vec2::new(window_size.width as f32 * -0.48, 0.),
-            rotation: 0.,
-            scale: 100.,
-        };
-
-        let instance_buffer = device.create_buffer_init(&BufferInitDescriptor {
-            label: Some("Instance Buffer"),
-            contents: bytemuck::cast_slice(&[instance.to_raw()]),
-            usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
-        });
-
         Self {
+            position,
             direction,
             up,
             down,
+            width,
+            height,
             mesh,
-            instance,
-            instance_buffer,
+        }
+    }
+
+    pub fn to_raw(&self) -> PaddleRaw {
+        PaddleRaw {
+            position: self.position,
+        }
+    }
+
+    pub fn update(
+        &mut self,
+        last_update: Instant,
+        pressed_keys: &HashSet<VirtualKeyCode>,
+        window_size: &PhysicalSize<u32>,
+    ) {
+        self.direction = Vec2::ZERO;
+
+        if pressed_keys.contains(&self.up) {
+            self.direction += Vec2::NEG_Y;
+        }
+
+        if pressed_keys.contains(&self.down) {
+            self.direction += Vec2::Y;
+        }
+
+        self.position += self.direction * (Instant::now() - last_update).as_secs_f32() * 300.;
+
+        let limit = window_size.height as f32 / 2. - 50.;
+        self.position.y = self.position.y.clamp(-limit, limit);
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+pub struct PaddleRaw {
+    pub position: Vec2,
+}
+
+impl PaddleRaw {
+    pub fn desc<'a>() -> VertexBufferLayout<'a> {
+        use std::mem;
+
+        VertexBufferLayout {
+            array_stride: mem::size_of::<PaddleRaw>() as BufferAddress,
+            step_mode: VertexStepMode::Instance,
+            attributes: &[VertexAttribute {
+                offset: 0,
+                shader_location: 2,
+                format: VertexFormat::Float32x2,
+            }],
         }
     }
 }

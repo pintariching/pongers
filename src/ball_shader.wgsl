@@ -6,43 +6,38 @@ struct Camera {
 var<uniform> camera: Camera;
 
 struct VertexInput {
-    @location(0) position: vec3<f32>,
-    @location(1) color: vec3<f32>,
+    @location(0) position: vec2<f32>,
 };
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) coord: vec2<f32>,
+    @location(1) radius: f32,
 };
 
-struct InstanceInput {
-    @location(2) model_matrix_0: vec4<f32>,
-    @location(3) model_matrix_1: vec4<f32>,
-    @location(4) model_matrix_2: vec4<f32>,
-    @location(5) model_matrix_3: vec4<f32>,
+struct Ball {
+    @location(2) center: vec2<f32>,
+    @location(3) radius: f32,
 }
 
 @vertex
-fn vs_main(vert: VertexInput) -> VertexOutput {
+fn vs_main(vert: VertexInput, ball: Ball) -> VertexOutput {
     var out: VertexOutput;
 
-    out.position = camera.view_proj * vec4<f32>(vert.position, 1.);
+    out.position = camera.view_proj * vec4<f32>(vert.position + ball.center, 0., 1.);
     out.coord = vert.position.xy;
+    out.radius = ball.radius;
 
     return out;
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let r: f32 = dot(in.coord, in.coord);
+    // let r: f32 = dot(in.coord, in.coord);
 
-    if r > 100. {
-        discard;
-    }
+    // if r > in.radius {
+    //     discard;
+    // }
 
-    return vec4(1.);
+    return vec4<f32>(in.coord, 0., 1.);
 }
-
-// fn circle_shape(position: vec3<f32>, radius: f32) -> f32 {
-//     return step(radius, length(position));
-// }
