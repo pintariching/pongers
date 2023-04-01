@@ -1,5 +1,6 @@
 use std::{collections::HashSet, time::Instant};
 
+use bytemuck::{Pod, Zeroable};
 use glam::Vec2;
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
@@ -9,79 +10,63 @@ use wgpu::{
 };
 use winit::{dpi::PhysicalSize, event::VirtualKeyCode};
 
-use crate::{
-    ball::Ball,
-    camera::{Camera, CameraUniform},
-    paddle::Paddle,
-};
+use crate::{ball::Ball, paddle::Paddle};
+
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+pub struct Uniforms {
+    pub left_paddle_position: Vec2,
+    pub left_paddle_width: f32,
+    pub left_paddle_height: f32,
+    pub right_paddle_position: Vec2,
+    pub right_paddle_width: f32,
+    pub right_paddle_height: f32,
+    pub ball_position: Vec2,
+    pub ball_radius: f32,
+    _padding: f32,
+}
+
+impl Uniforms {
+    pub fn new(left: &Paddle, right: &Paddle, ball: &Ball) -> Self {
+        Self {
+            left_paddle_position: left.position,
+            left_paddle_width: left.width,
+            left_paddle_height: left.height,
+            right_paddle_position: right.position,
+            right_paddle_width: right.width,
+            right_paddle_height: right.height,
+            ball_position: ball.center,
+            ball_radius: ball.radius,
+            _padding: 0.,
+        }
+    }
+}
 
 pub struct GameState {
     pub start_time: Instant,
     pub last_update: Instant,
     pub pressed_keys: HashSet<VirtualKeyCode>,
     pub left_paddle: Paddle,
-    pub left_paddle_buffer: Buffer,
     pub right_paddle: Paddle,
-    pub right_paddle_buffer: Buffer,
     pub ball: Ball,
-    pub ball_buffer: Buffer,
-    pub camera: Camera,
-    pub camera_uniform: CameraUniform,
-    pub camera_buffer: Buffer,
-    pub camera_bind_group: BindGroup,
-    pub camera_bind_group_layout: BindGroupLayout,
+    pub uniforms: Uniforms,
+    pub uniforms_buffer: Buffer,
+    pub uniforms_bind_group_layout: BindGroupLayout,
+    pub uniforms_bind_group: BindGroup,
 }
 
 impl GameState {
     pub fn new(device: &Device, window_size: &PhysicalSize<u32>) -> Self {
-        let camera = Camera {
-            focus_position: Vec2::new(0., 0.),
-            zoom: 1.,
-            window_size: window_size.clone(),
-            aspect_ratio: 3. / 4.,
-        };
-
-        let camera_uniform = CameraUniform::new(&camera);
-        let camera_buffer = device.create_buffer_init(&BufferInitDescriptor {
-            label: Some("Camera Buffer"),
-            contents: bytemuck::cast_slice(&[camera_uniform]),
-            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-        });
-
-        let camera_bind_group_layout =
-            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                entries: &[BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: ShaderStages::VERTEX,
-                    ty: BindingType::Buffer {
-                        ty: BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                }],
-                label: Some("camera_bind_group_layout"),
-            });
-
-        let camera_bind_group = device.create_bind_group(&BindGroupDescriptor {
-            layout: &camera_bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: camera_buffer.as_entire_binding(),
-            }],
-            label: Some("camera_bind_group"),
-        });
-
-        let ball = Ball::new(device, Vec2::new(0., 0.), 100.);
-        let ball_buffer = device.create_buffer_init(&BufferInitDescriptor {
-            label: Some("Ball Buffer"),
-            contents: bytemuck::cast_slice(&[ball.to_raw()]),
-            usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
-        });
+        let ball = Ball::new(
+            Vec2::new(
+                window_size.width as f32 / 2.,
+                window_size.height as f32 / 2.,
+            ),
+            10.,
+        );
 
         let left_paddle = Paddle::new(
-            device,
-            Vec2::new(-(window_size.width as f32 / 2.) + 50., 0.),
+            Vec2::new(20., window_size.height as f32 / 2.),
             Vec2::X,
             VirtualKeyCode::W,
             VirtualKeyCode::S,
@@ -89,15 +74,11 @@ impl GameState {
             100.,
         );
 
-        let left_paddle_buffer = device.create_buffer_init(&BufferInitDescriptor {
-            label: Some("Left Paddle Buffer"),
-            contents: bytemuck::cast_slice(&[left_paddle.to_raw()]),
-            usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
-        });
-
         let right_paddle = Paddle::new(
-            device,
-            Vec2::new((window_size.width as f32 / 2.) - 50., 0.),
+            Vec2::new(
+                window_size.width as f32 - 20.,
+                window_size.height as f32 / 2.,
+            ),
             Vec2::NEG_X,
             VirtualKeyCode::Up,
             VirtualKeyCode::Down,
@@ -105,10 +86,36 @@ impl GameState {
             100.,
         );
 
-        let right_paddle_buffer = device.create_buffer_init(&BufferInitDescriptor {
-            label: Some("Right Paddle Buffer"),
-            contents: bytemuck::cast_slice(&[right_paddle.to_raw()]),
-            usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
+        let uniforms = Uniforms::new(&left_paddle, &right_paddle, &ball);
+
+        let uniforms_buffer = device.create_buffer_init(&BufferInitDescriptor {
+            label: Some("Uniforms Buffer"),
+            contents: bytemuck::cast_slice(&[uniforms]),
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+        });
+
+        let uniforms_bind_group_layout =
+            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+                label: Some("Uniforms Bind Group Layout"),
+                entries: &[BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::FRAGMENT,
+                    count: None,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                }],
+            });
+
+        let uniforms_bind_group = device.create_bind_group(&BindGroupDescriptor {
+            layout: &uniforms_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: uniforms_buffer.as_entire_binding(),
+            }],
+            label: Some("camera_bind_group"),
         });
 
         GameState {
@@ -116,37 +123,25 @@ impl GameState {
             last_update: Instant::now(),
             pressed_keys: HashSet::new(),
             left_paddle,
-            left_paddle_buffer,
             right_paddle,
-            right_paddle_buffer,
             ball,
-            ball_buffer,
-            camera,
-            camera_uniform,
-            camera_buffer,
-            camera_bind_group,
-            camera_bind_group_layout,
+            uniforms,
+            uniforms_buffer,
+            uniforms_bind_group_layout,
+            uniforms_bind_group,
         }
     }
 
     pub fn update(&mut self) {
-        self.left_paddle.update(
-            self.last_update,
-            &self.pressed_keys,
-            &self.camera.window_size,
-        );
+        self.left_paddle
+            .update(self.last_update, &self.pressed_keys);
 
-        self.right_paddle.update(
-            self.last_update,
-            &self.pressed_keys,
-            &self.camera.window_size,
-        );
+        self.right_paddle
+            .update(self.last_update, &self.pressed_keys);
 
-        self.ball.update(
-            self.last_update,
-            &self.camera.window_size,
-            &self.left_paddle,
-            &self.right_paddle,
-        );
+        self.ball
+            .update(self.last_update, &self.left_paddle, &self.right_paddle);
+
+        self.uniforms = Uniforms::new(&self.left_paddle, &self.right_paddle, &self.ball);
     }
 }
