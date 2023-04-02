@@ -7,7 +7,7 @@ use wgpu::{
     Surface, SurfaceConfiguration, SurfaceError, TextureUsages, TextureViewDescriptor,
 };
 use winit::dpi::PhysicalSize;
-use winit::event::{ElementState, KeyboardInput, WindowEvent};
+use winit::event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::window::Window;
 
 use crate::game_state::GameState;
@@ -207,6 +207,7 @@ impl State {
             self.config.width = new_size.width;
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
+            self.game_state.window_size = new_size;
         }
     }
 
@@ -233,6 +234,14 @@ impl State {
     }
 
     pub fn update(&mut self) {
+        if self
+            .game_state
+            .pressed_keys
+            .contains(&VirtualKeyCode::Space)
+        {
+            self.game_state = GameState::new(&self.device, &self.window().inner_size())
+        }
+
         self.queue.write_buffer(
             &self.game_state.uniforms_buffer,
             0,

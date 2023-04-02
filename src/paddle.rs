@@ -1,7 +1,9 @@
 use std::{collections::HashSet, time::Instant};
 
 use glam::Vec2;
-use winit::event::VirtualKeyCode;
+use winit::{dpi::PhysicalSize, event::VirtualKeyCode};
+
+use crate::ball::Ball;
 
 pub struct Paddle {
     pub position: Vec2,
@@ -31,7 +33,12 @@ impl Paddle {
         }
     }
 
-    pub fn update(&mut self, last_update: Instant, pressed_keys: &HashSet<VirtualKeyCode>) {
+    pub fn update(
+        &mut self,
+        last_update: Instant,
+        pressed_keys: &HashSet<VirtualKeyCode>,
+        window_size: PhysicalSize<u32>,
+    ) {
         self.direction = Vec2::ZERO;
 
         if pressed_keys.contains(&self.up) {
@@ -44,7 +51,27 @@ impl Paddle {
 
         self.position += self.direction * (Instant::now() - last_update).as_secs_f32() * 300.;
 
-        // let limit = window_size.height as f32 / 2. - 50.;
-        // self.position.y = self.position.y.clamp(-limit, limit);
+        self.position.y = self.position.y.clamp(
+            self.height / 2.,
+            window_size.height as f32 - self.height / 2.,
+        );
+    }
+
+    pub fn check_intersection(&self, ball: &Ball) -> bool {
+        let ball_left = ball.position.x - ball.radius;
+        let ball_right = ball.position.x + ball.radius;
+        let ball_top = ball.position.y + ball.radius;
+        let ball_bottom = ball.position.y - ball.radius;
+
+        let w = self.width / 2.;
+        let h = self.height / 2.;
+
+        if (ball_left < self.position.x + w && ball_right > self.position.x - w)
+            && (ball_bottom > self.position.y - h && ball_top < self.position.y + h)
+        {
+            return true;
+        }
+
+        false
     }
 }
