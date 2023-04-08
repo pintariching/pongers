@@ -1,5 +1,6 @@
 use std::time::Instant;
 
+use bytemuck::{Pod, Zeroable};
 use glam::Vec2;
 
 pub struct Ball {
@@ -20,4 +21,20 @@ impl Ball {
     pub fn update(&mut self, last_update: Instant) {
         self.position += self.velocity * (Instant::now() - last_update).as_secs_f32();
     }
+
+    pub fn to_raw(&self) -> BallRaw {
+        BallRaw {
+            position: self.position,
+            radius: self.radius,
+            _padding: 0.,
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+pub struct BallRaw {
+    pub position: Vec2,
+    pub radius: f32,
+    _padding: f32,
 }

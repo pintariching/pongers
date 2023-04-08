@@ -11,6 +11,7 @@ use winit::event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::window::Window;
 
 use crate::game_state::GameState;
+use crate::paddle::PaddleRaw;
 
 pub struct State {
     pub surface: Surface,
@@ -19,8 +20,7 @@ pub struct State {
     pub config: SurfaceConfiguration,
     pub size: PhysicalSize<u32>,
     pub window: Window,
-    pub paddle_render_pipeline: RenderPipeline,
-    pub ball_render_pipeline: RenderPipeline,
+    pub render_pipeline: RenderPipeline,
     pub game_state: GameState,
 }
 
@@ -97,57 +97,20 @@ impl State {
         surface.configure(&device, &config);
 
         let vertex_shader = device.create_shader_module(include_wgsl!("vertex.wgsl"));
-        let paddle_shader = device.create_shader_module(include_wgsl!("paddle_shader.wgsl"));
-        let ball_shader = device.create_shader_module(include_wgsl!("ball_shader.wgsl"));
+        let fragment_shader = device.create_shader_module(include_wgsl!("fragment.wgsl"));
 
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[&game_state.uniforms_bind_group_layout],
+                bind_group_layouts: &[
+                    &game_state.ball_storage_bind_group_layout,
+                    &game_state.paddle_storage_bind_group_layout,
+                ],
                 push_constant_ranges: &[],
             });
 
-        let paddle_render_pipeline =
-            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some("Paddle Render Pipeline"),
-                layout: Some(&render_pipeline_layout),
-                vertex: wgpu::VertexState {
-                    module: &vertex_shader,
-                    entry_point: "vs_main",
-                    buffers: &[],
-                },
-                fragment: Some(wgpu::FragmentState {
-                    module: &paddle_shader,
-                    entry_point: "fs_main",
-                    targets: &[Some(wgpu::ColorTargetState {
-                        format: config.format,
-                        blend: Some(wgpu::BlendState::REPLACE),
-                        write_mask: wgpu::ColorWrites::ALL,
-                    })],
-                }),
-                primitive: wgpu::PrimitiveState {
-                    topology: wgpu::PrimitiveTopology::TriangleList,
-                    strip_index_format: None,
-                    front_face: wgpu::FrontFace::Ccw,
-                    cull_mode: Some(wgpu::Face::Back),
-                    // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
-                    polygon_mode: wgpu::PolygonMode::Fill,
-                    // Requires Features::DEPTH_CLIP_CONTROL
-                    unclipped_depth: false,
-                    // Requires Features::CONSERVATIVE_RASTERIZATION
-                    conservative: false,
-                },
-                depth_stencil: None,
-                multisample: wgpu::MultisampleState {
-                    count: 1,
-                    mask: !0,
-                    alpha_to_coverage_enabled: false,
-                },
-                multiview: None,
-            });
-
-        let ball_render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Ball Render Pipeline"),
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Render Pipeline"),
             layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &vertex_shader,
@@ -155,7 +118,7 @@ impl State {
                 buffers: &[],
             },
             fragment: Some(wgpu::FragmentState {
-                module: &ball_shader,
+                module: &fragment_shader,
                 entry_point: "fs_main",
                 targets: &[Some(wgpu::ColorTargetState {
                     format: config.format,
@@ -191,8 +154,7 @@ impl State {
             config,
             size,
             window,
-            paddle_render_pipeline,
-            ball_render_pipeline,
+            render_pipeline,
             game_state,
         }
     }
@@ -243,9 +205,26 @@ impl State {
         }
 
         self.queue.write_buffer(
-            &self.game_state.uniforms_buffer,
+            &self.game_state.ball_storage_buffer,
             0,
-            bytemuck::cast_slice(&[self.game_state.uniforms]),
+            bytemuck::cast_slice(&[self.game_state.ball.to_raw()]),
+        );
+
+        let raw_paddles: [PaddleRaw; 8] = [
+            self.game_state.paddles[0].to_raw(),
+            self.game_state.paddles[1].to_raw(),
+            self.game_state.paddles[2].to_raw(),
+            self.game_state.paddles[3].to_raw(),
+            self.game_state.paddles[4].to_raw(),
+            self.game_state.paddles[5].to_raw(),
+            self.game_state.paddles[6].to_raw(),
+            self.game_state.paddles[7].to_raw(),
+        ];
+
+        self.queue.write_buffer(
+            &self.game_state.paddle_storage_buffer,
+            0,
+            bytemuck::cast_slice(&[raw_paddles]),
         );
 
         self.game_state.last_update = Instant::now();
@@ -283,12 +262,9 @@ impl State {
                 depth_stencil_attachment: None,
             });
 
-            render_pass.set_pipeline(&self.paddle_render_pipeline);
-            render_pass.set_bind_group(0, &self.game_state.uniforms_bind_group, &[]);
-            render_pass.draw(0..3, 0..1);
-
-            render_pass.set_pipeline(&self.ball_render_pipeline);
-            render_pass.set_bind_group(0, &self.game_state.uniforms_bind_group, &[]);
+            render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.set_bind_group(0, &self.game_state.ball_storage_bind_group, &[]);
+            render_pass.set_bind_group(1, &self.game_state.paddle_storage_bind_group, &[]);
             render_pass.draw(0..3, 0..1);
         }
 
