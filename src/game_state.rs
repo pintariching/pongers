@@ -1,6 +1,6 @@
 use std::{collections::HashSet, time::Instant};
 
-use glam::Vec2;
+use glam::{Mat2, Vec2};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     BindGroup, BindGroupDescriptor, BindGroupLayout, BindGroupLayoutDescriptor,
@@ -13,6 +13,11 @@ use crate::{
     ball::Ball,
     paddle::{Paddle, PaddleRaw},
 };
+
+pub enum Intersection {
+    Point(Vec2),
+    Edge,
+}
 
 pub struct GameState {
     pub start_time: Instant,
@@ -168,8 +173,8 @@ impl GameState {
 
             p.update(self.last_update, &self.pressed_keys, &self.window_size);
 
-            if p.check_intersection(&self.ball) {
-                let v = calculate_reflection(&self.ball, &p);
+            if let Some(intersection) = p.check_intersection(&self.ball) {
+                let v = calculate_reflection(&self.ball, &p, intersection);
                 self.ball.velocity = v;
             }
         }
@@ -190,7 +195,11 @@ impl GameState {
     }
 }
 
-fn calculate_reflection(ball: &Ball, paddle: &Paddle) -> Vec2 {
+fn calculate_reflection(ball: &Ball, paddle: &Paddle, intersection: Intersection) -> Vec2 {
+    let rotation_matrix = Mat2::from_angle(paddle.rotation);
+    let w = paddle.width / 2.;
+    let h = paddle.height / 2.;
+
     let n = Vec2::X;
     let proj = ball.velocity.project_onto_normalized(n);
     let i = proj * -2.;

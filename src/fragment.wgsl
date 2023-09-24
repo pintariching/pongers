@@ -29,7 +29,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         let p = paddles[i];
 
         if p.is_active == 0 {
-            continue
+            continue;
         }
 
         // Check if pixel is inside of the square
@@ -50,5 +50,5 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         return vec4(1.);
     }
 
-    discard
+    discard;
 }

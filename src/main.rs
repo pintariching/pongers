@@ -1,7 +1,11 @@
 use pongers::run;
 
-#[tokio::main]
-async fn main() {
+fn main() -> std::io::Result<()> {
     tracing_subscriber::fmt::init();
-    run().await;
+
+    smol::block_on(async {
+        run().await;
+
+        Ok(())
+    })
 }

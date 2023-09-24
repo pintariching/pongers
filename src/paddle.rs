@@ -4,7 +4,7 @@ use bytemuck::{Pod, Zeroable};
 use glam::{Mat2, Vec2};
 use winit::{dpi::PhysicalSize, event::VirtualKeyCode};
 
-use crate::ball::Ball;
+use crate::{ball::Ball, game_state::Intersection};
 
 pub struct Paddle {
     pub position: Vec2,
@@ -90,7 +90,7 @@ impl Paddle {
         );
     }
 
-    pub fn check_intersection(&self, ball: &Ball) -> bool {
+    pub fn check_intersection(&self, ball: &Ball) -> Option<Intersection> {
         let rotation_matrix = Mat2::from_angle(self.rotation);
         let w = self.width / 2.;
         let h = self.height / 2.;
@@ -106,19 +106,19 @@ impl Paddle {
         let rot_d = self.position + rotation_matrix * d;
 
         if (ball.position - rot_a).length() < ball.radius {
-            return true;
+            return Some(Intersection::Point(a));
         }
 
         if (ball.position - rot_b).length() < ball.radius {
-            return true;
+            return Some(Intersection::Point(b));
         }
 
         if (ball.position - rot_c).length() < ball.radius {
-            return true;
+            return Some(Intersection::Point(c));
         }
 
         if (ball.position - rot_d).length() < ball.radius {
-            return true;
+            return Some(Intersection::Point(d));
         }
 
         let ball_relative = Mat2::from_angle(-self.rotation) * (ball.position - self.position);
@@ -129,10 +129,10 @@ impl Paddle {
         let ball_bottom = ball_relative.y + ball.radius;
 
         if ball_left < w && ball_right > -w && ball_bottom < h && ball_top > -h {
-            return true;
+            return Some(Intersection::Edge);
         }
 
-        false
+        None
     }
 
     pub fn corners(&self) -> [Vec2; 4] {
