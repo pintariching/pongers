@@ -90,8 +90,37 @@ impl Paddle {
         );
     }
 
-    pub fn check_intersection(&self, ball: &Ball) -> Option<Intersection> {
+    pub fn check_intersection(&self, ball: &Ball) -> bool {
+        let corners = self.corners();
+
+        for (i, corner) in corners.iter().enumerate() {
+            let a = *corner;
+            let b = corners[(i + 1) % corners.len()];
+
+            let edge = b - a;
+            let axis = edge.perp();
+
+            let mut paddle_min = f32::MIN;
+            let mut paddle_max = f32::MAX;
+
+            for c in corners {
+                let proj = c.dot(axis);
+
+                if proj < paddle_min {
+                    paddle_min = proj
+                }
+
+                if proj > paddle_max {
+                    paddle_max = proj;
+                }
+            }
+
+            let mut ball_min = f32::MIN;
+            let mut ball_max = f32::MAX;
+        }
+
         let rotation_matrix = Mat2::from_angle(self.rotation);
+
         let w = self.width / 2.;
         let h = self.height / 2.;
 
@@ -105,34 +134,18 @@ impl Paddle {
         let rot_c = self.position + rotation_matrix * c;
         let rot_d = self.position + rotation_matrix * d;
 
-        if (ball.position - rot_a).length() < ball.radius {
-            return Some(Intersection::Point(a));
-        }
+        let edge_x = rot_b - rot_a;
+        let axis_x = edge_x.perp();
 
-        if (ball.position - rot_b).length() < ball.radius {
-            return Some(Intersection::Point(b));
-        }
+        let proj_a_x = rot_a.project_onto(axis_x);
+        let proj_b_x = rot_b.project_onto(axis_x);
+        let proj_c_x = rot_c.project_onto(axis_x);
+        let proj_d_x = rot_d.project_onto(axis_x);
 
-        if (ball.position - rot_c).length() < ball.radius {
-            return Some(Intersection::Point(c));
-        }
+        let edge_y = rot_c - rot_b;
+        let axis_y = edge_y.perp();
 
-        if (ball.position - rot_d).length() < ball.radius {
-            return Some(Intersection::Point(d));
-        }
-
-        let ball_relative = Mat2::from_angle(-self.rotation) * (ball.position - self.position);
-
-        let ball_left = ball_relative.x - ball.radius;
-        let ball_right = ball_relative.x + ball.radius;
-        let ball_top = ball_relative.y - ball.radius;
-        let ball_bottom = ball_relative.y + ball.radius;
-
-        if ball_left < w && ball_right > -w && ball_bottom < h && ball_top > -h {
-            return Some(Intersection::Edge);
-        }
-
-        None
+        todo!();
     }
 
     pub fn corners(&self) -> [Vec2; 4] {

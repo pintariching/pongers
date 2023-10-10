@@ -14,9 +14,9 @@ use crate::{
     paddle::{Paddle, PaddleRaw},
 };
 
+#[derive(Debug)]
 pub enum Intersection {
-    Point(Vec2),
-    Edge,
+    Edge(Vec2),
 }
 
 pub struct GameState {
@@ -78,7 +78,7 @@ impl GameState {
 
         let paddles = [
             Paddle::new(
-                Vec2::new(20., window_size.height as f32 / 2.),
+                Vec2::new(200., window_size.height as f32 / 2.),
                 Vec2::X,
                 VirtualKeyCode::W,
                 VirtualKeyCode::S,
@@ -87,19 +87,20 @@ impl GameState {
                 true,
                 0.,
             ),
-            Paddle::new(
-                Vec2::new(
-                    window_size.width as f32 - 20.,
-                    window_size.height as f32 / 2.,
-                ),
-                Vec2::NEG_X,
-                VirtualKeyCode::Up,
-                VirtualKeyCode::Down,
-                20.,
-                100.,
-                true,
-                0.,
-            ),
+            // Paddle::new(
+            //     Vec2::new(
+            //         window_size.width as f32 - 20.,
+            //         window_size.height as f32 / 2.,
+            //     ),
+            //     Vec2::NEG_X,
+            //     VirtualKeyCode::Up,
+            //     VirtualKeyCode::Down,
+            //     20.,
+            //     100.,
+            //     true,
+            //     0.,
+            // ),
+            Paddle::default(),
             Paddle::default(),
             Paddle::default(),
             Paddle::default(),
@@ -173,9 +174,11 @@ impl GameState {
 
             p.update(self.last_update, &self.pressed_keys, &self.window_size);
 
-            if let Some(intersection) = p.check_intersection(&self.ball) {
-                let v = calculate_reflection(&self.ball, &p, intersection);
-                self.ball.velocity = v;
+            if p.check_intersection(&self.ball) {
+                //dbg!(&intersection);
+
+                //let v = calculate_reflection(&self.ball, &p, intersection);
+                //self.ball.velocity = v;
             }
         }
 
@@ -191,7 +194,7 @@ impl GameState {
             self.ball.velocity = v;
         }
 
-        self.ball.update(self.last_update);
+        self.ball.update(self.last_update, &self.pressed_keys);
     }
 }
 

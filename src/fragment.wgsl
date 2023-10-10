@@ -22,7 +22,6 @@ var<storage> ball: Ball;
 @group(1) @binding(0)
 var<storage> paddles: array<Paddle, 8>;
 
-
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     for (var i = 0; i < 8; i++) {

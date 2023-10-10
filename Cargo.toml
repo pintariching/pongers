@@ -6,11 +6,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tracing = "0.1"
-tracing-subscriber = "0.3"
-winit = "0.28"
 wgpu = "0.17"
+winit = "0.28"
 bytemuck = { version = "1", features = ["derive"] }
-glam = { version = "0.24", features = ["bytemuck"] }
 
 smol = "1"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+glam = { version = "0.24", features = ["bytemuck"] }
