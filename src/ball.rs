@@ -40,6 +40,15 @@ impl Ball {
         // self.position += self.velocity * (Instant::now() - last_update).as_secs_f32();
     }
 
+    pub fn corners(&self, axis: Vec2) -> [Vec2; 2] {
+        let norm_axis = axis.normalize();
+
+        let a = self.position + norm_axis * self.radius;
+        let b = self.position - norm_axis * self.radius;
+
+        [a, b]
+    }
+
     pub fn to_raw(&self) -> BallRaw {
         BallRaw {
             position: self.position,

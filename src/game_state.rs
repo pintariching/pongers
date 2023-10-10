@@ -175,6 +175,8 @@ impl GameState {
             p.update(self.last_update, &self.pressed_keys, &self.window_size);
 
             if p.check_intersection(&self.ball) {
+                dbg!("Intersection");
+                dbg!(Instant::now());
                 //dbg!(&intersection);
 
                 //let v = calculate_reflection(&self.ball, &p, intersection);
