@@ -4,7 +4,7 @@ use bytemuck::{Pod, Zeroable};
 use glam::{Mat2, Vec2};
 use winit::{dpi::PhysicalSize, event::VirtualKeyCode};
 
-use crate::{ball::Ball, game_state::Intersection};
+use crate::ball::Ball;
 
 pub struct Paddle {
     pub position: Vec2,
@@ -93,39 +93,10 @@ impl Paddle {
     pub fn check_intersection(&self, ball: &Ball) -> bool {
         let paddle_corners = self.corners();
 
-        let axis = paddle_corners[1] - paddle_corners[0];
-        let paddle_proj = paddle_corners.iter().map(|c| c.dot(axis));
+        let axis_a = paddle_corners[1] - paddle_corners[0];
+        let axis_b = paddle_corners[2] - paddle_corners[1];
 
-        let paddle_min = paddle_proj.clone().reduce(f32::min).unwrap();
-        let paddle_max = paddle_proj.reduce(f32::max).unwrap();
-
-        let ball_corners = ball.corners(axis);
-        let ball_proj = ball_corners.iter().map(|c| c.dot(axis));
-
-        let ball_min = ball_proj.clone().reduce(f32::min).unwrap();
-        let ball_max = ball_proj.reduce(f32::max).unwrap();
-
-        if paddle_min >= ball_max || ball_min >= paddle_max {
-            return false;
-        }
-
-        let axis = paddle_corners[2] - paddle_corners[1];
-        let paddle_proj = paddle_corners.iter().map(|c| c.dot(axis));
-
-        let paddle_min = paddle_proj.clone().reduce(f32::min).unwrap();
-        let paddle_max = paddle_proj.reduce(f32::max).unwrap();
-
-        let ball_corners = ball.corners(axis);
-        let ball_proj = ball_corners.iter().map(|c| c.dot(axis));
-
-        let ball_min = ball_proj.clone().reduce(f32::min).unwrap();
-        let ball_max = ball_proj.reduce(f32::max).unwrap();
-
-        if paddle_min >= ball_max || ball_min >= paddle_max {
-            return false;
-        }
-
-        true
+        !(check_intersection(axis_a, self, ball) || check_intersection(axis_b, self, ball))
     }
 
     pub fn corners(&self) -> [Vec2; 4] {
@@ -158,6 +129,25 @@ impl Paddle {
             _padding: 0.,
         }
     }
+}
+
+fn check_intersection(axis: Vec2, paddle: &Paddle, ball: &Ball) -> bool {
+    let paddle_corners = paddle.corners();
+    let paddle_proj = paddle_corners.iter().map(|c| c.dot(axis));
+
+    let paddle_min = paddle_proj.clone().reduce(f32::min).unwrap();
+    let paddle_max = paddle_proj.reduce(f32::max).unwrap();
+
+    let ball_corners = ball.corners(axis);
+    let ball_proj = ball_corners.iter().map(|c| c.dot(axis));
+
+    let ball_min = ball_proj.clone().reduce(f32::min).unwrap();
+    let ball_max = ball_proj.reduce(f32::max).unwrap();
+
+    println!("paddle_min:{paddle_min}, ball_max: {ball_max}");
+    println!("paddle_max:{paddle_max}, ball_min: {ball_min}");
+
+    (paddle_min >= ball_max) || (ball_min >= paddle_max)
 }
 
 #[repr(C)]

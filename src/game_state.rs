@@ -14,11 +14,6 @@ use crate::{
     paddle::{Paddle, PaddleRaw},
 };
 
-#[derive(Debug)]
-pub enum Intersection {
-    Edge(Vec2),
-}
-
 pub struct GameState {
     pub start_time: Instant,
     pub last_update: Instant,
@@ -175,8 +170,7 @@ impl GameState {
             p.update(self.last_update, &self.pressed_keys, &self.window_size);
 
             if p.check_intersection(&self.ball) {
-                dbg!("Intersection");
-                dbg!(Instant::now());
+                println!("Intersection at: {:?}", Instant::now());
                 //dbg!(&intersection);
 
                 //let v = calculate_reflection(&self.ball, &p, intersection);
@@ -200,7 +194,7 @@ impl GameState {
     }
 }
 
-fn calculate_reflection(ball: &Ball, paddle: &Paddle, intersection: Intersection) -> Vec2 {
+fn calculate_reflection(ball: &Ball, paddle: &Paddle) -> Vec2 {
     let rotation_matrix = Mat2::from_angle(paddle.rotation);
     let w = paddle.width / 2.;
     let h = paddle.height / 2.;
