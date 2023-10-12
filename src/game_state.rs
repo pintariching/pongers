@@ -1,6 +1,6 @@
 use std::{collections::HashSet, time::Instant};
 
-use glam::{Mat2, Vec2};
+use glam::Vec2;
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     BindGroup, BindGroupDescriptor, BindGroupLayout, BindGroupLayoutDescriptor,
@@ -73,7 +73,7 @@ impl GameState {
 
         let paddles = [
             Paddle::new(
-                Vec2::new(200., window_size.height as f32 / 2.),
+                Vec2::new(50., window_size.height as f32 / 2.),
                 Vec2::X,
                 VirtualKeyCode::W,
                 VirtualKeyCode::S,
@@ -169,12 +169,11 @@ impl GameState {
 
             p.update(self.last_update, &self.pressed_keys, &self.window_size);
 
-            if p.check_intersection(&self.ball) {
-                println!("Intersection at: {:?}", Instant::now());
-                //dbg!(&intersection);
+            if let Some(normal) = p.check_intersection(&self.ball) {
+                println!("Intersection normal: {:?}", normal);
 
-                //let v = calculate_reflection(&self.ball, &p, intersection);
-                //self.ball.velocity = v;
+                let v = calculate_reflection(normal, &self.ball, &p);
+                self.ball.velocity = v;
             }
         }
 
@@ -194,13 +193,8 @@ impl GameState {
     }
 }
 
-fn calculate_reflection(ball: &Ball, paddle: &Paddle) -> Vec2 {
-    let rotation_matrix = Mat2::from_angle(paddle.rotation);
-    let w = paddle.width / 2.;
-    let h = paddle.height / 2.;
-
-    let n = Vec2::X;
-    let proj = ball.velocity.project_onto_normalized(n);
+fn calculate_reflection(normal: Vec2, ball: &Ball, paddle: &Paddle) -> Vec2 {
+    let proj = ball.velocity.project_onto_normalized(normal);
     let i = proj * -2.;
     let mut new_v = i + ball.velocity;
 
@@ -208,7 +202,7 @@ fn calculate_reflection(ball: &Ball, paddle: &Paddle) -> Vec2 {
 
     new_v.y = diff * 100.;
 
-    new_v.clamp_length_max(200.);
+    new_v.clamp_length_max(100.);
     new_v
 }
 

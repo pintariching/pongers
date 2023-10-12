@@ -21,6 +21,7 @@ pub struct State {
     pub size: PhysicalSize<u32>,
     pub window: Window,
     pub render_pipeline: RenderPipeline,
+    pub debug_render_pipeline: RenderPipeline,
     pub game_state: GameState,
 }
 
@@ -144,6 +145,40 @@ impl State {
             multiview: None,
         });
 
+        let debug_shader = device.create_shader_module(include_wgsl!("debug_shader.wgsl"));
+
+        let debug_render_pipeline =
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("Debug Render Pipeline"),
+                layout: Some(&render_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &debug_shader,
+                    entry_point: "vs_main",
+                    buffers: &[],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &debug_shader,
+                    entry_point: "fs_main",
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: config.format,
+                        blend: Some(wgpu::BlendState::REPLACE),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::LineList,
+                    front_face: wgpu::FrontFace::Ccw,
+                    ..Default::default()
+                },
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState {
+                    count: 1,
+                    mask: !0,
+                    alpha_to_coverage_enabled: false,
+                },
+                multiview: None,
+            });
+
         Self {
             surface,
             device,
@@ -152,6 +187,7 @@ impl State {
             size,
             window,
             render_pipeline,
+            debug_render_pipeline,
             game_state,
         }
     }
@@ -263,6 +299,9 @@ impl State {
             render_pass.set_bind_group(0, &self.game_state.ball_storage_bind_group, &[]);
             render_pass.set_bind_group(1, &self.game_state.paddle_storage_bind_group, &[]);
             render_pass.draw(0..3, 0..1);
+
+            render_pass.set_pipeline(&self.debug_render_pipeline);
+            render_pass.draw(0..6, 0..1)
         }
 
         // submit will accept anything that implements IntoIter

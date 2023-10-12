@@ -21,23 +21,23 @@ impl Ball {
     }
 
     pub fn update(&mut self, last_update: Instant, pressed_keys: &HashSet<VirtualKeyCode>) {
-        if pressed_keys.contains(&VirtualKeyCode::Up) {
-            self.position += Vec2::NEG_Y * ((Instant::now() - last_update).as_secs_f32() * 100.);
-        }
+        // if pressed_keys.contains(&VirtualKeyCode::Up) {
+        //     self.position += Vec2::NEG_Y * ((Instant::now() - last_update).as_secs_f32() * 100.);
+        // }
 
-        if pressed_keys.contains(&VirtualKeyCode::Down) {
-            self.position += Vec2::Y * ((Instant::now() - last_update).as_secs_f32() * 100.);
-        }
+        // if pressed_keys.contains(&VirtualKeyCode::Down) {
+        //     self.position += Vec2::Y * ((Instant::now() - last_update).as_secs_f32() * 100.);
+        // }
 
-        if pressed_keys.contains(&VirtualKeyCode::Left) {
-            self.position += Vec2::NEG_X * ((Instant::now() - last_update).as_secs_f32() * 100.);
-        }
+        // if pressed_keys.contains(&VirtualKeyCode::Left) {
+        //     self.position += Vec2::NEG_X * ((Instant::now() - last_update).as_secs_f32() * 100.);
+        // }
 
-        if pressed_keys.contains(&VirtualKeyCode::Right) {
-            self.position += Vec2::X * ((Instant::now() - last_update).as_secs_f32() * 100.);
-        }
+        // if pressed_keys.contains(&VirtualKeyCode::Right) {
+        //     self.position += Vec2::X * ((Instant::now() - last_update).as_secs_f32() * 100.);
+        // }
 
-        // self.position += self.velocity * (Instant::now() - last_update).as_secs_f32();
+        self.position += self.velocity * (Instant::now() - last_update).as_secs_f32();
     }
 
     pub fn corners(&self, axis: Vec2) -> [Vec2; 2] {

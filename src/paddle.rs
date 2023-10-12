@@ -75,11 +75,11 @@ impl Paddle {
         }
 
         if pressed_keys.contains(&VirtualKeyCode::Q) {
-            self.rotation += 0.5 * (Instant::now() - last_update).as_secs_f32();
+            self.rotation += 0.6 * (Instant::now() - last_update).as_secs_f32();
         }
 
         if pressed_keys.contains(&VirtualKeyCode::E) {
-            self.rotation -= 0.5 * (Instant::now() - last_update).as_secs_f32();
+            self.rotation -= 0.6 * (Instant::now() - last_update).as_secs_f32();
         }
 
         self.position += self.direction * (Instant::now() - last_update).as_secs_f32() * 300.;
@@ -90,13 +90,34 @@ impl Paddle {
         );
     }
 
-    pub fn check_intersection(&self, ball: &Ball) -> bool {
+    pub fn check_intersection(&self, ball: &Ball) -> Option<Vec2> {
         let paddle_corners = self.corners();
 
-        let axis_a = paddle_corners[1] - paddle_corners[0];
-        let axis_b = paddle_corners[2] - paddle_corners[1];
+        let axis_a = (paddle_corners[1] - paddle_corners[0]).normalize();
+        let axis_b = (paddle_corners[2] - paddle_corners[1]).normalize();
 
-        !(check_intersection(axis_a, self, ball) || check_intersection(axis_b, self, ball))
+        let closest_corner = paddle_corners.clone().iter().fold(Vec2::MAX, |mut acc, c| {
+            let dist = (ball.position - *c).length();
+            if dist < acc.length() {
+                acc = *c
+            }
+
+            acc
+        });
+
+        let axis_c = (closest_corner - ball.position).normalize();
+
+        match (
+            check_seperating_axis_exists(axis_a, paddle_corners, ball),
+            check_seperating_axis_exists(axis_b, paddle_corners, ball),
+            check_seperating_axis_exists(axis_c, paddle_corners, ball),
+        ) {
+            (Some(a), Some(b), Some(c)) if (a < b) && (a < c) => Some(axis_a),
+            (Some(a), Some(b), Some(c)) if (b < a) && (b < c) => Some(axis_b),
+            (Some(a), Some(b), Some(c)) if (c < a) && (c < b) => Some(axis_c),
+            _ => None,
+        }
+        // && !check_seperating_axis_exists(axis_c, paddle_corners, ball)
     }
 
     pub fn corners(&self) -> [Vec2; 4] {
@@ -131,8 +152,7 @@ impl Paddle {
     }
 }
 
-fn check_intersection(axis: Vec2, paddle: &Paddle, ball: &Ball) -> bool {
-    let paddle_corners = paddle.corners();
+fn check_seperating_axis_exists(axis: Vec2, paddle_corners: [Vec2; 4], ball: &Ball) -> Option<f32> {
     let paddle_proj = paddle_corners.iter().map(|c| c.dot(axis));
 
     let paddle_min = paddle_proj.clone().reduce(f32::min).unwrap();
@@ -144,10 +164,13 @@ fn check_intersection(axis: Vec2, paddle: &Paddle, ball: &Ball) -> bool {
     let ball_min = ball_proj.clone().reduce(f32::min).unwrap();
     let ball_max = ball_proj.reduce(f32::max).unwrap();
 
-    println!("paddle_min:{paddle_min}, ball_max: {ball_max}");
-    println!("paddle_max:{paddle_max}, ball_min: {ball_min}");
+    // Axis seperating the ball and paddle exists, so they're not colliding
+    if (paddle_min >= ball_max) || (ball_min >= paddle_max) {
+        return None;
+    }
 
-    (paddle_min >= ball_max) || (ball_min >= paddle_max)
+    let depth = f32::min(ball_max - paddle_min, paddle_max - ball_min);
+    Some(depth)
 }
 
 #[repr(C)]
