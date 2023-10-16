@@ -1,11 +1,15 @@
-use pongers::run;
+use bevy::prelude::{App, Camera2dBundle, Commands, FixedTime, Startup};
+use bevy::DefaultPlugins;
+use bevy_xpbd_2d::prelude::PhysicsPlugins;
 
-fn main() -> std::io::Result<()> {
-    tracing_subscriber::fmt::init();
+fn main() {
+    App::new()
+        .add_plugins((DefaultPlugins, PhysicsPlugins::default()))
+        .insert_resource(FixedTime::new_from_secs(1. / 60.))
+        .add_systems(Startup, setup)
+        .run();
+}
 
-    smol::block_on(async {
-        run().await;
-
-        Ok(())
-    })
+fn setup(mut commands: Commands) {
+    commands.spawn(Camera2dBundle::default());
 }
