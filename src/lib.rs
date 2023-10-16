@@ -8,6 +8,7 @@ use winit::{
 };
 
 mod ball;
+mod debug;
 mod game_state;
 mod paddle;
 mod state;

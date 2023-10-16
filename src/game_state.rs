@@ -4,15 +4,16 @@ use glam::Vec2;
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     BindGroup, BindGroupDescriptor, BindGroupLayout, BindGroupLayoutDescriptor,
-    BindGroupLayoutEntry, BindingType, Buffer, BufferBindingType, BufferUsages, Device,
+    BindGroupLayoutEntry, BindingType, Buffer, BufferBindingType, BufferUsages, Color, Device,
     ShaderStages,
 };
 use winit::{dpi::PhysicalSize, event::VirtualKeyCode};
 
-use crate::{
-    ball::Ball,
-    paddle::{Paddle, PaddleRaw},
-};
+use crate::debug::DebugLine;
+use crate::paddle::{Paddle, PaddleRaw};
+use crate::{ball::Ball, debug::debug_lines_to_points};
+
+pub const MAX_DEBUG_LINE_COUNT: usize = 32;
 
 pub struct GameState {
     pub start_time: Instant,
@@ -27,6 +28,8 @@ pub struct GameState {
     pub ball_storage_bind_group_layout: BindGroupLayout,
     pub ball_storage_bind_group: BindGroup,
     pub window_size: PhysicalSize<u32>,
+    pub debug_lines: [DebugLine; MAX_DEBUG_LINE_COUNT],
+    pub debug_line_buffer: Buffer,
 }
 
 impl GameState {
@@ -73,7 +76,7 @@ impl GameState {
 
         let paddles = [
             Paddle::new(
-                Vec2::new(50., window_size.height as f32 / 2.),
+                Vec2::new(200., window_size.height as f32 / 2.),
                 Vec2::X,
                 VirtualKeyCode::W,
                 VirtualKeyCode::S,
@@ -145,6 +148,13 @@ impl GameState {
             label: Some("Paddle Storage Bind Group"),
         });
 
+        let debug_lines = [DebugLine::default(); MAX_DEBUG_LINE_COUNT];
+        let debug_line_buffer = device.create_buffer_init(&BufferInitDescriptor {
+            label: Some("Debug Line Buffer"),
+            contents: bytemuck::cast_slice(&[debug_lines_to_points(debug_lines)]),
+            usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
+        });
+
         GameState {
             start_time: Instant::now(),
             last_update: Instant::now(),
@@ -158,6 +168,8 @@ impl GameState {
             ball_storage_bind_group,
             ball_storage_bind_group_layout,
             window_size: window_size.clone(),
+            debug_lines,
+            debug_line_buffer,
         }
     }
 
@@ -174,8 +186,16 @@ impl GameState {
 
                 let v = calculate_reflection(normal, &self.ball, &p);
                 self.ball.velocity = v;
+
+                let x = p.position.x / self.window_size.width as f32 - 0.5;
+                let y = p.position.y / self.window_size.height as f32 - 0.5;
+                let pos = Vec2::new(x, y);
+
+                self.debug_lines[0] = DebugLine::new(pos, pos + (normal * 100.), Color::GREEN);
             }
         }
+
+        self.debug_lines[2] = DebugLine::new(Vec2::new(0., 0.), Vec2::new(0.5, 0.5), Color::BLUE);
 
         if self.ball.position.y - self.ball.radius < 0. {
             // Top wall collision

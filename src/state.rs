@@ -1,16 +1,18 @@
 use std::time::Instant;
 
 use wgpu::{
-    include_wgsl, Backends, Color, CommandEncoderDescriptor, Device, DeviceDescriptor, Features,
-    InstanceDescriptor, Limits, LoadOp, Operations, PowerPreference, Queue,
-    RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RequestAdapterOptions,
+    include_wgsl, Backends, BufferAddress, Color, CommandEncoderDescriptor, Device,
+    DeviceDescriptor, Features, InstanceDescriptor, Limits, LoadOp, Operations, PowerPreference,
+    Queue, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RequestAdapterOptions,
     Surface, SurfaceConfiguration, SurfaceError, TextureUsages, TextureViewDescriptor,
+    VertexAttribute, VertexBufferLayout, VertexFormat,
 };
 use winit::dpi::PhysicalSize;
 use winit::event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::window::Window;
 
-use crate::game_state::GameState;
+use crate::debug::{debug_lines_to_points, DebugLinePoint};
+use crate::game_state::{GameState, MAX_DEBUG_LINE_COUNT};
 use crate::paddle::PaddleRaw;
 
 pub struct State {
@@ -147,14 +149,36 @@ impl State {
 
         let debug_shader = device.create_shader_module(include_wgsl!("debug_shader.wgsl"));
 
+        let debug_render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Debug Render Pipeline Layout"),
+                bind_group_layouts: &[],
+                push_constant_ranges: &[],
+            });
+
         let debug_render_pipeline =
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some("Debug Render Pipeline"),
-                layout: Some(&render_pipeline_layout),
+                layout: Some(&debug_render_pipeline_layout),
                 vertex: wgpu::VertexState {
                     module: &debug_shader,
                     entry_point: "vs_main",
-                    buffers: &[],
+                    buffers: &[VertexBufferLayout {
+                        array_stride: std::mem::size_of::<DebugLinePoint>() as BufferAddress,
+                        step_mode: wgpu::VertexStepMode::Vertex,
+                        attributes: &[
+                            VertexAttribute {
+                                offset: 0,
+                                shader_location: 0,
+                                format: VertexFormat::Float32x2,
+                            },
+                            VertexAttribute {
+                                offset: std::mem::size_of::<[f32; 2]>() as BufferAddress,
+                                shader_location: 1,
+                                format: VertexFormat::Float32x4,
+                            },
+                        ],
+                    }],
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: &debug_shader,
@@ -260,6 +284,12 @@ impl State {
             bytemuck::cast_slice(&[raw_paddles]),
         );
 
+        self.queue.write_buffer(
+            &self.game_state.debug_line_buffer,
+            0,
+            bytemuck::cast_slice(&[debug_lines_to_points(self.game_state.debug_lines)]),
+        );
+
         self.game_state.last_update = Instant::now();
     }
 
@@ -301,7 +331,8 @@ impl State {
             render_pass.draw(0..3, 0..1);
 
             render_pass.set_pipeline(&self.debug_render_pipeline);
-            render_pass.draw(0..6, 0..1)
+            render_pass.set_vertex_buffer(0, self.game_state.debug_line_buffer.slice(..));
+            render_pass.draw(0..(MAX_DEBUG_LINE_COUNT * 2) as u32, 0..1)
         }
 
         // submit will accept anything that implements IntoIter

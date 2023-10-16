@@ -93,7 +93,7 @@ impl Paddle {
     pub fn check_intersection(&self, ball: &Ball) -> Option<Vec2> {
         let paddle_corners = self.corners();
 
-        let axis_a = (paddle_corners[1] - paddle_corners[0]).normalize();
+        let axis_a = (paddle_corners[0] - paddle_corners[1]).normalize();
         let axis_b = (paddle_corners[2] - paddle_corners[1]).normalize();
 
         let closest_corner = paddle_corners.clone().iter().fold(Vec2::MAX, |mut acc, c| {
