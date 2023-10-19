@@ -1,18 +1,17 @@
 use bevy::prelude::*;
 use bevy::DefaultPlugins;
 use bevy_xpbd_2d::prelude::PhysicsPlugins;
-use paddle::setup_paddles;
-use paddle::update_paddle;
-use paddle::Paddle;
+use paddle::PaddlePlugin;
 
 mod paddle;
 
 fn main() {
     App::new()
         .add_plugins((DefaultPlugins, PhysicsPlugins::default()))
+        .add_plugins(PaddlePlugin)
         .insert_resource(FixedTime::new_from_secs(1. / 60.))
-        .add_systems(Startup, (setup, setup_paddles))
-        .add_systems(Update, (update_paddle, update))
+        .add_systems(Startup, setup)
+        .add_systems(Update, update)
         .run();
 }
 
@@ -20,8 +19,4 @@ fn setup(mut commands: Commands) {
     commands.spawn(Camera2dBundle::default());
 }
 
-fn update(query: Query<&Paddle>) {
-    for paddle in &query {
-        println!("{:#?}", paddle);
-    }
-}
+fn update() {}
