@@ -1,9 +1,10 @@
 use bevy::prelude::*;
+use bevy_xpbd_2d::prelude::*;
 
 const PADDLE_WIDTH: f32 = 20.;
 const PADDLE_HEIGHT: f32 = 100.;
 const PADDLE_SPEED: f32 = 200.;
-const PADDLE_ROTATION_SPEED: f32 = 3.; // Radians! - Roughly half a rotation per second.
+const PADDLE_ROTATION_SPEED: f32 = 180.; // In degrees per second
 
 pub struct PaddlePlugin;
 
@@ -15,24 +16,28 @@ impl Plugin for PaddlePlugin {
 }
 
 #[derive(Bundle)]
-pub struct PaddleBundle {
-    pub paddle: Paddle,
-    pub mesh: ColorMesh2dBundle,
+struct PaddleBundle {
+    paddle: Paddle,
+    mesh: ColorMesh2dBundle,
+    rigid_body: RigidBody,
+    collider: Collider,
+    position: Position,
+    rotation: Rotation,
+    restitution: Restitution,
 }
 
 #[derive(Component)]
-pub struct Paddle {
-    pub width: f32,
-    pub height: f32,
-    pub position: Vec3,
-    pub rotation: f32,
-    pub speed: f32,
-    pub up: KeyCode,
-    pub down: KeyCode,
-    pub rotate_plus: KeyCode,
-    pub rotate_minus: KeyCode,
-    pub rotation_speed: f32,
-    pub scale: Vec3,
+struct Paddle {
+    width: f32,
+    height: f32,
+    position: Vec2,
+    rotation: f32,
+    speed: f32,
+    up: KeyCode,
+    down: KeyCode,
+    rotate_plus: KeyCode,
+    rotate_minus: KeyCode,
+    rotation_speed: f32,
 }
 
 fn setup_paddles(
@@ -40,11 +45,13 @@ fn setup_paddles(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
+    let position = Vec2::new(-500., 0.);
+
     commands.spawn(PaddleBundle {
         paddle: Paddle {
             width: PADDLE_WIDTH,
             height: PADDLE_HEIGHT,
-            position: Vec3::new(-500., 0., 0.),
+            position,
             rotation: 0.,
             speed: PADDLE_SPEED,
             up: KeyCode::W,
@@ -52,34 +59,40 @@ fn setup_paddles(
             rotate_plus: KeyCode::Q,
             rotate_minus: KeyCode::E,
             rotation_speed: PADDLE_ROTATION_SPEED,
-            scale: Vec3::ONE,
         },
         mesh: ColorMesh2dBundle {
             mesh: meshes
-                .add(shape::Quad::new(Vec2::new(PADDLE_WIDTH, PADDLE_HEIGHT)).into())
+                .add(shape::Quad::new(Vec2::new(1., 1.)).into())
                 .into(),
             material: materials.add(ColorMaterial::from(Color::WHITE)),
-            transform: Transform::from_translation(Vec3::new(50., 50., 0.)),
+            transform: Transform::from_scale(Vec3::new(PADDLE_WIDTH, PADDLE_HEIGHT, 1.)),
             ..default()
         },
+        rigid_body: RigidBody::Kinematic,
+        collider: Collider::cuboid(PADDLE_WIDTH, PADDLE_HEIGHT),
+        position: Position(position),
+        rotation: Rotation::from_degrees(0.),
+        restitution: Restitution::new(0.),
     });
 }
 
 fn update_paddle(
     input: Res<Input<KeyCode>>,
     time: Res<Time>,
-    mut query: Query<(&mut Paddle, &mut Transform)>,
+    mut query: Query<(&mut Paddle, &mut Position, &mut Rotation)>,
 ) {
-    for (mut paddle, mut transform) in query.iter_mut() {
+    for (mut paddle, mut position, mut rotation) in query.iter_mut() {
         handle_paddle_input(&mut paddle, &input, time.delta_seconds());
 
-        let mut new_transform = Transform::from_translation(paddle.position);
-        new_transform.rotate(Quat::from_axis_angle(
-            Vec3::new(0., 0., 1.),
-            paddle.rotation,
-        ));
+        // let mut new_transform = Transform::from_translation(paddle.position.extend(0.));
+        // new_transform.rotate(Quat::from_axis_angle(
+        //     Vec3::new(0., 0., 1.),
+        //     paddle.rotation,
+        // ));
 
-        *transform = new_transform.with_scale(paddle.scale);
+        position.0 = paddle.position;
+        *rotation = Rotation::from_degrees(paddle.rotation);
+        //*mesh_transform = new_transform.with_scale(Vec3::new(paddle.width, paddle.height, 1.));
 
         // *mesh_handle = meshes
         //     .add(shape::Quad::new(Vec2::new(paddle.width, paddle.height)).into())
@@ -105,10 +118,10 @@ fn handle_paddle_input(paddle: &mut Paddle, input: &Res<Input<KeyCode>>, delta_t
     }
 
     if input.pressed(KeyCode::F) {
-        paddle.scale.y += 0.5 * delta_time;
+        paddle.height += 0.5 * delta_time;
     }
 
     if input.pressed(KeyCode::G) {
-        paddle.scale.y -= 0.5 * delta_time;
+        paddle.height -= 0.5 * delta_time;
     }
 }
