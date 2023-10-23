@@ -5,7 +5,8 @@ pub struct BallPlugin;
 
 impl Plugin for BallPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup_ball);
+        app.add_systems(Startup, setup_ball)
+            .add_systems(Update, reset_ball);
     }
 }
 
@@ -19,6 +20,7 @@ pub struct BallBundle {
     velocity: LinearVelocity,
     restitution: Restitution,
     gravity_scale: GravityScale,
+    locked_axes: LockedAxes,
 }
 
 #[derive(Component)]
@@ -44,5 +46,18 @@ fn setup_ball(
         velocity: LinearVelocity(Vec2::new(-200., 10.)),
         restitution: Restitution::new(1.),
         gravity_scale: GravityScale(0.),
+        locked_axes: LockedAxes::new().lock_rotation(),
     });
+}
+
+fn reset_ball(
+    input: Res<Input<KeyCode>>,
+    mut query: Query<(&Ball, &mut Position, &mut LinearVelocity)>,
+) {
+    if input.pressed(KeyCode::Space) {
+        let (_ball, mut position, mut velocity) = query.get_single_mut().unwrap();
+
+        *position = Position(Vec2::new(0., 0.));
+        *velocity = LinearVelocity(Vec2::new(-200., 10.));
+    }
 }

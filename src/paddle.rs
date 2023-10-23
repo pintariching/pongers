@@ -30,8 +30,6 @@ struct PaddleBundle {
 struct Paddle {
     width: f32,
     height: f32,
-    position: Vec2,
-    rotation: f32,
     speed: f32,
     up: KeyCode,
     down: KeyCode,
@@ -51,8 +49,6 @@ fn setup_paddles(
         paddle: Paddle {
             width: PADDLE_WIDTH,
             height: PADDLE_HEIGHT,
-            position,
-            rotation: 0.,
             speed: PADDLE_SPEED,
             up: KeyCode::W,
             down: KeyCode::S,
@@ -72,17 +68,23 @@ fn setup_paddles(
         collider: Collider::cuboid(PADDLE_WIDTH, PADDLE_HEIGHT),
         position: Position(position),
         rotation: Rotation::from_degrees(0.),
-        restitution: Restitution::new(0.),
+        restitution: Restitution::new(1.),
     });
 }
 
 fn update_paddle(
     input: Res<Input<KeyCode>>,
     time: Res<Time>,
-    mut query: Query<(&mut Paddle, &mut Position, &mut Rotation)>,
+    mut query: Query<(&Paddle, &mut Position, &mut Rotation)>,
 ) {
-    for (mut paddle, mut position, mut rotation) in query.iter_mut() {
-        handle_paddle_input(&mut paddle, &input, time.delta_seconds());
+    for (paddle, mut position, mut rotation) in query.iter_mut() {
+        handle_paddle_input(
+            paddle,
+            &mut position,
+            &mut rotation,
+            &input,
+            time.delta_seconds(),
+        );
 
         // let mut new_transform = Transform::from_translation(paddle.position.extend(0.));
         // new_transform.rotate(Quat::from_axis_angle(
@@ -90,8 +92,6 @@ fn update_paddle(
         //     paddle.rotation,
         // ));
 
-        position.0 = paddle.position;
-        *rotation = Rotation::from_degrees(paddle.rotation);
         //*mesh_transform = new_transform.with_scale(Vec3::new(paddle.width, paddle.height, 1.));
 
         // *mesh_handle = meshes
@@ -100,28 +100,36 @@ fn update_paddle(
     }
 }
 
-fn handle_paddle_input(paddle: &mut Paddle, input: &Res<Input<KeyCode>>, delta_time: f32) {
+fn handle_paddle_input(
+    paddle: &Paddle,
+    position: &mut Position,
+    rotation: &mut Rotation,
+    input: &Res<Input<KeyCode>>,
+    delta_time: f32,
+) {
     if input.pressed(paddle.up) {
-        paddle.position.y += paddle.speed * delta_time;
+        position.y += paddle.speed * delta_time;
     }
 
     if input.pressed(paddle.down) {
-        paddle.position.y -= paddle.speed * delta_time;
+        position.y -= paddle.speed * delta_time;
     }
 
     if input.pressed(paddle.rotate_plus) {
-        paddle.rotation += paddle.rotation_speed * delta_time;
+        let r = rotation.as_degrees();
+        *rotation = Rotation::from_degrees(r + paddle.rotation_speed * delta_time);
     }
 
     if input.pressed(paddle.rotate_minus) {
-        paddle.rotation -= paddle.rotation_speed * delta_time;
+        let r = rotation.as_degrees();
+        *rotation = Rotation::from_degrees(r - paddle.rotation_speed * delta_time);
     }
 
-    if input.pressed(KeyCode::F) {
-        paddle.height += 0.5 * delta_time;
-    }
+    // if input.pressed(KeyCode::F) {
+    //     paddle.height += 0.5 * delta_time;
+    // }
 
-    if input.pressed(KeyCode::G) {
-        paddle.height -= 0.5 * delta_time;
-    }
+    // if input.pressed(KeyCode::G) {
+    //     paddle.height -= 0.5 * delta_time;
+    // }
 }
