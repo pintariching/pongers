@@ -3,8 +3,12 @@ use bevy_xpbd_2d::prelude::*;
 
 const PADDLE_WIDTH: f32 = 20.;
 const PADDLE_HEIGHT: f32 = 100.;
-const PADDLE_SPEED: f32 = 200.;
-const PADDLE_ROTATION_SPEED: f32 = 180.; // In degrees per second
+
+const PADDLE_LINEAR_ACCEL: f32 = 4000.;
+const PADDLE_LINEAR_DAMPING: f32 = 10.;
+const PADDLE_MAX_LINEAR_VELOCITY: f32 = 2000.;
+
+const PADDLE_ANGULAR_ACCEL: f32 = 10.;
 
 pub struct PaddlePlugin;
 
@@ -24,18 +28,24 @@ struct PaddleBundle {
     position: Position,
     rotation: Rotation,
     restitution: Restitution,
+    velocity: LinearVelocity,
+    damping: LinearDamping,
+    angular_velocity: AngularVelocity,
+    angular_damping: AngularDamping,
 }
 
 #[derive(Component)]
 struct Paddle {
     width: f32,
     height: f32,
-    speed: f32,
+    linear_acceleration: f32,
+    angular_acceleration: f32,
     up: KeyCode,
     down: KeyCode,
+    left: KeyCode,
+    right: KeyCode,
     rotate_plus: KeyCode,
     rotate_minus: KeyCode,
-    rotation_speed: f32,
 }
 
 fn setup_paddles(
@@ -43,18 +53,18 @@ fn setup_paddles(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-    let position = Vec2::new(-500., 0.);
-
     commands.spawn(PaddleBundle {
         paddle: Paddle {
             width: PADDLE_WIDTH,
             height: PADDLE_HEIGHT,
-            speed: PADDLE_SPEED,
+            linear_acceleration: PADDLE_LINEAR_ACCEL,
+            angular_acceleration: PADDLE_ANGULAR_ACCEL,
             up: KeyCode::W,
             down: KeyCode::S,
+            left: KeyCode::A,
+            right: KeyCode::D,
             rotate_plus: KeyCode::Q,
             rotate_minus: KeyCode::E,
-            rotation_speed: PADDLE_ROTATION_SPEED,
         },
         mesh: ColorMesh2dBundle {
             mesh: meshes
@@ -64,72 +74,107 @@ fn setup_paddles(
             transform: Transform::from_scale(Vec3::new(PADDLE_WIDTH, PADDLE_HEIGHT, 1.)),
             ..default()
         },
-        rigid_body: RigidBody::Kinematic,
+        rigid_body: RigidBody::Dynamic,
         collider: Collider::cuboid(PADDLE_WIDTH, PADDLE_HEIGHT),
-        position: Position(position),
+        position: Position(Vec2::new(-500., 0.)),
         rotation: Rotation::from_degrees(0.),
         restitution: Restitution::new(1.),
+        velocity: LinearVelocity(Vec2::ZERO),
+        damping: LinearDamping(10.),
+        angular_velocity: AngularVelocity(0.),
+        angular_damping: AngularDamping(5.),
+    });
+
+    commands.spawn(PaddleBundle {
+        paddle: Paddle {
+            width: PADDLE_WIDTH,
+            height: PADDLE_HEIGHT,
+            linear_acceleration: PADDLE_LINEAR_ACCEL,
+            angular_acceleration: PADDLE_ANGULAR_ACCEL,
+            up: KeyCode::Up,
+            down: KeyCode::Down,
+            left: KeyCode::Left,
+            right: KeyCode::Right,
+            rotate_plus: KeyCode::Numpad1,
+            rotate_minus: KeyCode::Numpad2,
+        },
+        mesh: ColorMesh2dBundle {
+            mesh: meshes
+                .add(shape::Quad::new(Vec2::new(1., 1.)).into())
+                .into(),
+            material: materials.add(ColorMaterial::from(Color::WHITE)),
+            transform: Transform::from_scale(Vec3::new(PADDLE_WIDTH, PADDLE_HEIGHT, 1.)),
+            ..default()
+        },
+        rigid_body: RigidBody::Dynamic,
+        collider: Collider::cuboid(PADDLE_WIDTH, PADDLE_HEIGHT),
+        position: Position(Vec2::new(500., 0.)),
+        rotation: Rotation::from_degrees(0.),
+        restitution: Restitution::new(1.),
+        velocity: LinearVelocity(Vec2::ZERO),
+        damping: LinearDamping(10.),
+        angular_velocity: AngularVelocity(0.),
+        angular_damping: AngularDamping(5.),
     });
 }
 
 fn update_paddle(
     input: Res<Input<KeyCode>>,
     time: Res<Time>,
-    mut query: Query<(&Paddle, &mut Position, &mut Rotation)>,
+    mut query: Query<(&Paddle, &mut LinearVelocity, &mut AngularVelocity)>,
 ) {
-    for (paddle, mut position, mut rotation) in query.iter_mut() {
-        handle_paddle_input(
-            paddle,
-            &mut position,
-            &mut rotation,
-            &input,
-            time.delta_seconds(),
-        );
-
-        // let mut new_transform = Transform::from_translation(paddle.position.extend(0.));
-        // new_transform.rotate(Quat::from_axis_angle(
-        //     Vec3::new(0., 0., 1.),
-        //     paddle.rotation,
-        // ));
-
-        //*mesh_transform = new_transform.with_scale(Vec3::new(paddle.width, paddle.height, 1.));
-
-        // *mesh_handle = meshes
-        //     .add(shape::Quad::new(Vec2::new(paddle.width, paddle.height)).into())
-        //     .into();
+    for (paddle, mut velocity, mut ang_velocity) in query.iter_mut() {
+        handle_linear_velocity(&paddle, &input, &mut velocity, time.delta_seconds());
+        handle_angular_velocity(&paddle, &input, &mut ang_velocity, time.delta_seconds());
     }
 }
 
-fn handle_paddle_input(
+fn handle_linear_velocity(
     paddle: &Paddle,
-    position: &mut Position,
-    rotation: &mut Rotation,
     input: &Res<Input<KeyCode>>,
+    velocity: &mut LinearVelocity,
     delta_time: f32,
 ) {
     if input.pressed(paddle.up) {
-        position.y += paddle.speed * delta_time;
+        velocity.y += paddle.linear_acceleration * delta_time;
     }
 
     if input.pressed(paddle.down) {
-        position.y -= paddle.speed * delta_time;
+        velocity.y -= paddle.linear_acceleration * delta_time;
     }
 
+    if input.pressed(paddle.left) {
+        velocity.x -= paddle.linear_acceleration * delta_time;
+    }
+
+    if input.pressed(paddle.right) {
+        velocity.x += paddle.linear_acceleration * delta_time;
+    }
+
+    velocity.0 = velocity.clamp_length_max(PADDLE_MAX_VELOCITY);
+}
+
+fn handle_angular_velocity(
+    paddle: &Paddle,
+    input: &Res<Input<KeyCode>>,
+    angular_velocity: &mut AngularVelocity,
+    delta_time: f32,
+) {
     if input.pressed(paddle.rotate_plus) {
-        let r = rotation.as_degrees();
-        *rotation = Rotation::from_degrees(r + paddle.rotation_speed * delta_time);
+        angular_velocity.0 += paddle.angular_acceleration * delta_time;
     }
 
     if input.pressed(paddle.rotate_minus) {
-        let r = rotation.as_degrees();
-        *rotation = Rotation::from_degrees(r - paddle.rotation_speed * delta_time);
+        angular_velocity.0 -= paddle.angular_acceleration * delta_time;
     }
-
-    // if input.pressed(KeyCode::F) {
-    //     paddle.height += 0.5 * delta_time;
-    // }
-
-    // if input.pressed(KeyCode::G) {
-    //     paddle.height -= 0.5 * delta_time;
-    // }
 }
+
+// fn limit_velocity(
+//     mut query: Query<(&Paddle, &mut LinearVelocity)>
+// ) {
+//     for (_paddle, mut velocity) in query.iter_mut() {
+//         if velocity.length() > {
+//             velocity.clamp_length_max(max)
+//         }
+//     }
+// }

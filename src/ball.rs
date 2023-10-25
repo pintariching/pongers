@@ -6,21 +6,21 @@ pub struct BallPlugin;
 impl Plugin for BallPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup_ball)
-            .add_systems(Update, reset_ball);
+            .add_systems(Update, (reset_ball, debug_rotation));
     }
 }
 
 #[derive(Bundle)]
 pub struct BallBundle {
     ball: Ball,
-    mesh: ColorMesh2dBundle,
+    ball_mesh: ColorMesh2dBundle,
     rigid_body: RigidBody,
     collider: Collider,
     position: Position,
     velocity: LinearVelocity,
+    angular_velocity: AngularVelocity,
     restitution: Restitution,
     gravity_scale: GravityScale,
-    locked_axes: LockedAxes,
 }
 
 #[derive(Component)]
@@ -35,7 +35,7 @@ fn setup_ball(
 
     commands.spawn(BallBundle {
         ball: Ball {},
-        mesh: ColorMesh2dBundle {
+        ball_mesh: ColorMesh2dBundle {
             mesh: meshes.add(shape::Circle::new(10.).into()).into(),
             material: materials.add(ColorMaterial::from(Color::WHITE)).into(),
             ..default()
@@ -44,10 +44,26 @@ fn setup_ball(
         collider: Collider::ball(10.),
         position: Position(position),
         velocity: LinearVelocity(Vec2::new(-200., 10.)),
+        angular_velocity: AngularVelocity(10.),
         restitution: Restitution::new(1.),
         gravity_scale: GravityScale(0.),
-        locked_axes: LockedAxes::new().lock_rotation(),
     });
+}
+
+fn debug_rotation(mut gizmos: Gizmos, query: Query<(&Ball, &Transform)>) {
+    for (_, transform) in query.iter() {
+        let rotation_z = transform.rotation.to_euler(EulerRot::XYZ).2;
+
+        let center = transform.translation.truncate();
+        let p = Vec2::new(0., 100.);
+
+        let x = p.x * rotation_z.cos() - p.y * rotation_z.sin();
+        let y = p.x * rotation_z.sin() + p.y * rotation_z.cos();
+
+        let end = center.clone() + Vec2::new(x, y);
+
+        gizmos.line_2d(center, end, Color::RED);
+    }
 }
 
 fn reset_ball(
