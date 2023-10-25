@@ -8,7 +8,9 @@ const PADDLE_LINEAR_ACCEL: f32 = 4000.;
 const PADDLE_LINEAR_DAMPING: f32 = 10.;
 const PADDLE_MAX_LINEAR_VELOCITY: f32 = 2000.;
 
-const PADDLE_ANGULAR_ACCEL: f32 = 10.;
+const PADDLE_ANGULAR_ACCEL: f32 = 40.;
+const PADDLE_ANGULAR_DAMPING: f32 = 10.;
+const PADDLE_MAX_ANGULAR_VELOCITY: f32 = 100.;
 
 pub struct PaddlePlugin;
 
@@ -80,9 +82,9 @@ fn setup_paddles(
         rotation: Rotation::from_degrees(0.),
         restitution: Restitution::new(1.),
         velocity: LinearVelocity(Vec2::ZERO),
-        damping: LinearDamping(10.),
+        damping: LinearDamping(PADDLE_LINEAR_DAMPING),
         angular_velocity: AngularVelocity(0.),
-        angular_damping: AngularDamping(5.),
+        angular_damping: AngularDamping(PADDLE_ANGULAR_DAMPING),
     });
 
     commands.spawn(PaddleBundle {
@@ -112,9 +114,9 @@ fn setup_paddles(
         rotation: Rotation::from_degrees(0.),
         restitution: Restitution::new(1.),
         velocity: LinearVelocity(Vec2::ZERO),
-        damping: LinearDamping(10.),
+        damping: LinearDamping(PADDLE_LINEAR_DAMPING),
         angular_velocity: AngularVelocity(0.),
-        angular_damping: AngularDamping(5.),
+        angular_damping: AngularDamping(PADDLE_ANGULAR_DAMPING),
     });
 }
 
@@ -151,7 +153,7 @@ fn handle_linear_velocity(
         velocity.x += paddle.linear_acceleration * delta_time;
     }
 
-    velocity.0 = velocity.clamp_length_max(PADDLE_MAX_VELOCITY);
+    velocity.0 = velocity.clamp_length_max(PADDLE_MAX_LINEAR_VELOCITY);
 }
 
 fn handle_angular_velocity(
@@ -167,14 +169,8 @@ fn handle_angular_velocity(
     if input.pressed(paddle.rotate_minus) {
         angular_velocity.0 -= paddle.angular_acceleration * delta_time;
     }
-}
 
-// fn limit_velocity(
-//     mut query: Query<(&Paddle, &mut LinearVelocity)>
-// ) {
-//     for (_paddle, mut velocity) in query.iter_mut() {
-//         if velocity.length() > {
-//             velocity.clamp_length_max(max)
-//         }
-//     }
-// }
+    angular_velocity.0 = angular_velocity
+        .0
+        .clamp(-PADDLE_MAX_ANGULAR_VELOCITY, PADDLE_MAX_ANGULAR_VELOCITY);
+}

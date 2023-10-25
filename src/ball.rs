@@ -44,7 +44,7 @@ fn setup_ball(
         collider: Collider::ball(10.),
         position: Position(position),
         velocity: LinearVelocity(Vec2::new(-200., 10.)),
-        angular_velocity: AngularVelocity(10.),
+        angular_velocity: AngularVelocity(0.),
         restitution: Restitution::new(1.),
         gravity_scale: GravityScale(0.),
     });
